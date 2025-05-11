@@ -1,0 +1,58 @@
+{
+    "PlanetConst" : [
+        {
+            "R" : 6.371e6, 
+            "M" : 5.972e24,
+            "G" : 6.67e-11,
+            "unitInfo" : "m, kg, m^3/(kg*s^2)"
+        }
+    ],
+
+    "SatelliteParams" : [
+        {
+            "mass" : 2,
+            "I" : [[0.9, 0, 0], [0, 0.9, 0], [0, 0, 0.3]],
+            "unitInfo" : "kg, kg*m^2"
+        }
+
+    ],
+
+    "InitialState" : [
+        {
+            "eulerAngles" : [10.0, 20.0, 30.0],
+            "angularVelocity" : [0.01, 0, 0.01],
+            "unitInfo" : "deg, rad/s"
+        }
+    ],
+
+    "Iterations" : [
+        {
+            "start" : 0,
+            "stop" : 1400,
+            "step" : 1,
+            "unitInfo" : "s"
+        }
+    ],
+
+    "Magnetorquer" : [
+        {
+            "n" : 84,
+            "A" : 2,
+            "unitInfo" : "coils, cm^2"
+        }
+    ],
+
+    "Date" : [
+        {
+            "now": "True",
+            "year" : 2023,
+            "month" : 10,
+            "day" : 1,
+            "hour" : 0,
+            "minute" : 0,
+            "second" : 0,
+            "unitInfo" : "year, month, day, hour, minute, second"
+        }
+    ]
+
+}
