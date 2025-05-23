@@ -10,7 +10,7 @@ class TwoLineElement(ABC):
 
     @property
     @abstractmethod
-    def line1(self) -> str:
+    def line_1(self) -> str:
         """
         First line of the TLE.
 
@@ -21,7 +21,7 @@ class TwoLineElement(ABC):
 
     @property
     @abstractmethod
-    def line2(self) -> str:
+    def line_2(self) -> str:
         """
         Second line of the TLE.
 
@@ -305,7 +305,7 @@ class TwoLineElementReader(TwoLineElement):
 
     # TODO add checksum validation
     @property
-    def line1(self) -> str:
+    def line_1(self) -> str:
         """
         First line of the TLE.
 
@@ -315,7 +315,7 @@ class TwoLineElementReader(TwoLineElement):
         return self.read_tle()[0]
 
     @property
-    def line2(self) -> str:
+    def line_2(self) -> str:
         """
         Second line of the TLE.
 
@@ -332,7 +332,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: 9-digit number.
         """
-        return self.line1[2:7]
+        return self.line_1[2:7]
 
     @property
     def classification(self) -> str:
@@ -342,7 +342,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: Classification of the satellite.
         """
-        return self.line1[7]
+        return self.line_1[7]
 
     @property
     def launch_year(self) -> int:
@@ -352,7 +352,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Two last digits of the launch year.
         """
-        return int(self.line1[9:11])
+        return int(self.line_1[9:11])
 
     @property
     def launch_number(self) -> int:
@@ -362,7 +362,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: 3-digit launch number of the satellite.
         """
-        return int(self.line1[11:14])
+        return int(self.line_1[11:14])
 
     @property
     def piece_launch(self) -> str:
@@ -372,7 +372,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: 3-digit piece of the launch.
         """
-        return self.line1[14:17]
+        return self.line_1[14:17]
 
     @property
     def epoch_year(self) -> int:
@@ -383,7 +383,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Two last digits of the year. May skip the first 0.
         """
-        return int(self.line1[18:20])
+        return int(self.line_1[18:20])
 
     @property
     def epoch_day(self) -> float:
@@ -394,7 +394,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Day of the year.
         """
-        return float(self.line1[20:32])
+        return float(self.line_1[20:32])
 
     @property
     def mean_motion_derivative_1(self) -> float:
@@ -405,7 +405,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: First derivative of the mean motion.
         """
-        return float(self.line1[33:43])
+        return float(self.line_1[33:43])
 
     @property
     def mean_motion_derivative_2(self) -> float:
@@ -415,7 +415,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Second derivative of the mean motion.
         """
-        return float(self.line1[44:52])
+        return float(self.line_1[44:52])
 
     @property
     def bstar_drag(self) -> float:
@@ -427,7 +427,8 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: BSTAR drag term.
         """
-        return str(self.line1[53:61])
+        # TODO add conversion to float
+        return str(self.line_1[53:61])
 
     @property
     def ephemeris_type(self) -> int:
@@ -437,7 +438,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Usually 0.
         """
-        return int(self.line1[62])
+        return int(self.line_1[62])
 
     @property
     def element_number(self) -> int:
@@ -447,7 +448,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: 3-digit number.
         """
-        return int(self.line1[64:68])
+        return int(self.line_1[64:68])
 
     @property
     def checksum_line1(self) -> int:
@@ -457,7 +458,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Checksum of the first line.
         """
-        return int(self.line1[68])
+        return int(self.line_1[68])
 
     @property
     def inclination(self) -> float:
@@ -468,7 +469,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Positive value in degrees.
         """
-        return float(self.line2[8:16])
+        return float(self.line_2[8:16])
 
     @property
     def raan(self) -> float:
@@ -479,7 +480,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line2[17:25])
+        return float(self.line_2[17:25])
 
     @property
     def eccentricity(self) -> float:
@@ -491,7 +492,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Eccentricity value between 0 and 1.
         """
-        return float(f"0.{self.line2[26:33]}")
+        return float(f"0.{self.line_2[26:33]}")
 
     @property
     def argument_of_perigee(self) -> float:
@@ -502,7 +503,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line2[34:43])
+        return float(self.line_2[34:43])
 
     @property
     def mean_anomaly(self) -> float:
@@ -513,7 +514,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line2[43:51])
+        return float(self.line_2[43:51])
 
     @property
     def mean_motion(self) -> float:
@@ -524,7 +525,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Number of revolutions per day.
         """
-        return float(self.line2[52:63])
+        return float(self.line_2[52:63])
 
     @property
     def revolution_number(self) -> int:
@@ -535,7 +536,7 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Revolution number.
         """
-        return int(self.line2[63:68])
+        return int(self.line_2[63:68])
 
     @property
     def checksum_line2(self) -> int:
@@ -545,4 +546,4 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Checksum of the second line.
         """
-        return int(self.line2[68])
+        return int(self.line_2[68])

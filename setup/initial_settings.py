@@ -202,7 +202,7 @@ class SimulationSetupReader(SimulationSetup):
         return inertia, mass
 
     @property
-    def planet_data(self) -> tuple[float, float, float]:
+    def planet_data(self) -> dict[float, float, float]:
         """
         Parameters and constants describing the planet (G, M, R).
 
@@ -211,11 +211,12 @@ class SimulationSetupReader(SimulationSetup):
             float: M - mass of the planet in kg.
             float: R - radius of the planet in m.
         """
-        G = self._setup["PlanetConst"][0]["G"]
-        M = self._setup["PlanetConst"][0]["M"]
-        R = self._setup["PlanetConst"][0]["R"]
+        data_dict = dict()
+        data_dict['G'] = self._setup["PlanetConst"][0]["G"]
+        data_dict['M'] = self._setup["PlanetConst"][0]["M"]
+        data_dict['R'] = self._setup["PlanetConst"][0]["R"]
 
-        return G, M, R
+        return data_dict
 
     @property
     def date_time(self) -> datetime.datetime:
