@@ -1,14 +1,12 @@
-import sgp4.api as sgp
 import pandas as pd
 import skyfield.api as skyfield
-# from setup.satellite import SatelliteImplementation
 
 
 def time_to_julian_date(satellite: object, iteration: int = 0) -> float:
     # sourcery skip: inline-immediately-returned-variable
     """
     Convert the current epoch to Julian Date. Current date is the epoch
-    of the TLE plus the number of seconds from simulation start. The 
+    of the TLE plus the number of seconds from simulation start. The
     Julian Date is a continuous count of days since the beginning of the Julian
     Period on January 1, 4713 BC at noon. It is used in astronomy
     and other fields to provide a uniform time scale for calculations.
@@ -36,6 +34,15 @@ def initialize_state_vector(satellite: object) -> pd.DataFrame:
     # sourcery skip: inline-immediately-returned-variable
     """
     Initialize the state vector of the satellite.
+
+    Args:
+        satellite (SatelliteImplementation): The satellite object containing
+        the TLE data and current status.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the initial state vector of the
+        satellite. The state vector includes position, velocity (both x, y and
+        z in GCRS), latitude, longitude and altitude.
     """
     # Get the initial position and velocity
     position = satellite.position(0)
@@ -64,6 +71,19 @@ def update_state_vector(
 ) -> pd.DataFrame:
     """
     Update the state vector of the satellite.
+
+    Args:
+        satellite (SatelliteImplementation): The satellite object containing
+        the TLE data and current status.
+        state_vector (pd.DataFrame): The DataFrame containing the current state
+        vector of the satellite.
+        iteration (int): The current iteration of the simulation. Is also equal
+        to the number of seconds from simulation start.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the updated state vector of the
+        satellite. The state vector includes position, velocity (both x, y and
+        z in GCRS), latitude, longitude and altitude.
     """
     # Get the new position and velocity
     position = satellite.position(iteration)
@@ -83,3 +103,23 @@ def update_state_vector(
     }
 
     return state_vector
+
+
+def get_lla(satellite: object, iteration: int) -> tuple:
+    """
+    Get the latitude, longitude and altitude of the satellite.
+
+    Args:
+        satellite (SatelliteImplementation): The satellite object containing
+        the TLE data and current status.
+        iteration (int): The current iteration of the simulation. Is also equal
+        to the number of seconds from simulation start.
+
+    Returns:
+        tuple: latitude, longitude and altitude of the satellite.
+    """
+    lat = satellite.latitude(iteration)
+    lon = satellite.longitude(iteration)
+    alt = satellite.altitude(iteration)
+
+    return lat, lon, alt

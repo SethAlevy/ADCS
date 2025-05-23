@@ -1,13 +1,9 @@
 from abc import ABC
 from abc import abstractmethod
 import numpy as np
-import pandas as pd
 from setup.two_line_element import TwoLineElement
 from setup.initial_settings import SimulationSetup
-from pathlib import Path
-import sgp4.api as sgp
 import skyfield.api as skyfield
-from scipy.spatial.transform import Rotation
 import setup.utilities as ut
 
 
@@ -86,7 +82,8 @@ class Satellite(ABC):
     @property
     def two_line_element(self) -> TwoLineElement:
         """
-        Two-line element set (TLE) of the satellite. Imported from file as object.
+        Two-line element set (TLE) of the satellite. Imported from file
+        as object.
         """
         pass
 
@@ -170,7 +167,10 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Latitude of the satellite in degrees.
         """
         julian_date = ut.time_to_julian_date(self, iteration)
-        return skyfield.wgs84.latlon_of(self._satellite_model.at(julian_date))[0].degrees
+        latlon = skyfield.wgs84.latlon_of(
+            self._satellite_model.at(julian_date)
+        )
+        return latlon[0].degrees
 
     def longitude(self, iteration) -> np.ndarray:
         """
