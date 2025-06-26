@@ -57,12 +57,12 @@ def plot_lla(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resol
 
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Latitude and longitude (degrees)', color='tab:blue')
-    ax1.plot(state_vector.index, state_vector['latitude'], color='tab:blue')
-    ax1.plot(state_vector.index, state_vector['longitude'], color='tab:orange')
+    ax1.plot(state_vector.index, state_vector['latitude'], color='tab:blue', label='Latitude')
+    ax1.plot(state_vector.index, state_vector['longitude'], color='tab:orange', label='Longitude')
 
     ax2 = ax1.twinx()
     ax2.set_ylabel('Altitude (km)', color='tab:green')
-    ax2.plot(state_vector.index, state_vector['altitude'], color='tab:green')
+    ax2.plot(state_vector.index, state_vector['altitude'], color='tab:green', label='Altitude')
     ax2.tick_params(axis='y', labelcolor='tab:green')
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     ax1.grid()

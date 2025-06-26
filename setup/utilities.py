@@ -1,8 +1,9 @@
 import pandas as pd
 import skyfield.api as skyfield
+from templates.satellite_template import Satellite
 
 
-def time_to_julian_date(satellite: object, iteration: int = 0) -> float:
+def time_julian_date(satellite: Satellite, iteration: int = 0) -> float:
     # sourcery skip: inline-immediately-returned-variable
     """
     Convert the current epoch to Julian Date. Current date is the epoch
@@ -12,7 +13,7 @@ def time_to_julian_date(satellite: object, iteration: int = 0) -> float:
     and other fields to provide a uniform time scale for calculations.
 
     Args:
-        satellite (SatelliteImplementation): The satellite object containing
+        satellite (Satelliten): The satellite object containing
         the TLE data.
         iteration (int): The current iteration of the simulation. Is also equal
         to the number of seconds from simulation start. Defaults to 0
@@ -20,23 +21,23 @@ def time_to_julian_date(satellite: object, iteration: int = 0) -> float:
     Returns:
         float: The Julian Date corresponding to the current epoch.
     """
-    
+
     # Get the Skyfield Time object for the TLE epoch
     tle_epoch_time = satellite._satellite_model.epoch
     time_scale = skyfield.load.timescale()
-    
+
     # Skyfield Time objects support adding seconds directly
     new_time = time_scale.tt_jd(tle_epoch_time.tt + iteration / 86400.0)
     return new_time
 
 
-def initialize_state_vector(satellite: object) -> pd.DataFrame:
+def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
     # sourcery skip: inline-immediately-returned-variable
     """
     Initialize the state vector of the satellite.
 
     Args:
-        satellite (SatelliteImplementation): The satellite object containing
+        satellite (Satellite): The satellite object containing
         the TLE data and current status.
 
     Returns:
@@ -49,31 +50,35 @@ def initialize_state_vector(satellite: object) -> pd.DataFrame:
     velocity = satellite.linear_velocity(0)
 
     # Create a DataFrame to store the state vector
-    state_vector = pd.DataFrame({
-        'position_x': position[0],
-        'position_y': position[1],
-        'position_z': position[2],
-        'velocity_x': velocity[0],
-        'velocity_y': velocity[1],
-        'velocity_z': velocity[2],
-        'latitude': satellite.latitude(0),
-        'longitude': satellite.longitude(0),
-        'altitude': satellite.altitude(0)
-    }, index=[0])
+    state_vector = pd.DataFrame(
+        {
+            "position_x": position[0],
+            "position_y": position[1],
+            "position_z": position[2],
+            "velocity_x": velocity[0],
+            "velocity_y": velocity[1],
+            "velocity_z": velocity[2],
+            "latitude": satellite.latitude(0),
+            "longitude": satellite.longitude(0),
+            "altitude": satellite.altitude(0),
+            "euler_z1": satellite.euler_angles()[0],
+            "euler_x1": satellite.euler_angles()[1],
+            "euler_z2": satellite.euler_angles()[2],
+        },
+        index=[0],
+    )
 
     return state_vector
 
 
 def update_state_vector(
-    satellite: object, 
-    state_vector: pd.DataFrame, 
-    iteration: int
+    satellite: Satellite, state_vector: pd.DataFrame, iteration: int
 ) -> pd.DataFrame:
     """
     Update the state vector of the satellite.
 
     Args:
-        satellite (SatelliteImplementation): The satellite object containing
+        satellite (Satellite): The satellite object containing
         the TLE data and current status.
         state_vector (pd.DataFrame): The DataFrame containing the current state
         vector of the satellite.
@@ -91,26 +96,29 @@ def update_state_vector(
 
     # Update the DataFrame with the new values
     state_vector.loc[iteration] = {
-        'position_x': position[0],
-        'position_y': position[1],
-        'position_z': position[2],
-        'velocity_x': velocity[0],
-        'velocity_y': velocity[1],
-        'velocity_z': velocity[2],
-        'latitude': satellite.latitude(iteration),
-        'longitude': satellite.longitude(iteration),
-        'altitude': satellite.altitude(iteration)
+        "position_x": position[0],
+        "position_y": position[1],
+        "position_z": position[2],
+        "velocity_x": velocity[0],
+        "velocity_y": velocity[1],
+        "velocity_z": velocity[2],
+        "latitude": satellite.latitude(iteration),
+        "longitude": satellite.longitude(iteration),
+        "altitude": satellite.altitude(iteration),
+        "euler_z1": satellite.euler_angles()[0],
+        "euler_x1": satellite.euler_angles()[1],
+        "euler_z2": satellite.euler_angles()[2],
     }
 
     return state_vector
 
 
-def get_lla(satellite: object, iteration: int) -> tuple:
+def get_lla(satellite: Satellite, iteration: int) -> tuple:
     """
     Get the latitude, longitude and altitude of the satellite.
 
     Args:
-        satellite (SatelliteImplementation): The satellite object containing
+        satellite (Satellite): The satellite object containing
         the TLE data and current status.
         iteration (int): The current iteration of the simulation. Is also equal
         to the number of seconds from simulation start.

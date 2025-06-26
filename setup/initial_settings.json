@@ -19,9 +19,9 @@
 
     "InitialState" : [
         {
-            "eulerAngles" : [10.0, 20.0, 30.0],
-            "angularVelocity" : [0.01, 0, 0.01],
-            "unitInfo" : "deg, rad/s"
+            "eulerAngles" : [120.0, 20.0, 90.0],
+            "angularVelocity" : [15, 10, 25],
+            "unitInfo" : "deg, deg/s"
         }
     ],
 

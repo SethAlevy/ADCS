@@ -22,7 +22,7 @@ class SimulationSetup(ABC):
         is used: Z-X-Z (or 3-1-3) convention, where the first rotation is
         around the Z-axis, the second rotation is around the X-axis, and the
         third rotation is around the Z-axis again. This rotation is supported
-        by scipy rotation library. The angles are in degrees.
+        by scipy rotation library. The angles are in degrees in ECI frame.
 
         returns:
             float: phi -180 to 180 degrees.
@@ -120,7 +120,7 @@ class SimulationSetupReader(SimulationSetup):
             return json.load(f)
 
     @property
-    def euler_angles(self) -> tuple[float, float, float]:
+    def euler_angles(self) -> np.ndarray:
         """
         Initial Euler angles phi, theta, psi. Extrinsic rotation conventions
         is used: Z-X-Z (or 3-1-3) convention, where the first rotation is
@@ -138,10 +138,10 @@ class SimulationSetupReader(SimulationSetup):
         theta = euler_angles[1]
         psi = euler_angles[2]
 
-        return phi, theta, psi
+        return np.array([phi, theta, psi])
 
     @property
-    def angular_velocity(self) -> tuple[float, float, float]:
+    def angular_velocity(self) -> np.ndarray:
         """
         Initial angular velocity (p, q, r) in rad/s.
 
@@ -155,7 +155,7 @@ class SimulationSetupReader(SimulationSetup):
         q = omega[1]
         r = omega[2]
 
-        return p, q, r
+        return np.array([p, q, r])
 
     @property
     def iterations_info(self) -> tuple[int, int, int]:
