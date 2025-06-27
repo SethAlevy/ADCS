@@ -18,15 +18,14 @@ class SimulationSetup(ABC):
     @abstractmethod
     def euler_angles(self) -> tuple[float, float, float]:
         """
-        Initial Euler angles phi, theta, psi. Extrinsic rotation conventions
-        is used: Z-X-Z (or 3-1-3) convention, where the first rotation is
-        around the Z-axis, the second rotation is around the X-axis, and the
-        third rotation is around the Z-axis again. This rotation is supported
-        by scipy rotation library. The angles are in degrees in ECI frame.
+        Initial Euler angles phi, theta, psi. The standard aerospace convention
+        X-Y-Z (known as roll-pitch-yaw) is used, where the first rotation is
+        around the X-axis (roll), the second rotation is around the Y-axis
+        (pitch), and the third rotation is around the Z-axis (yaw).
 
         returns:
             float: phi -180 to 180 degrees.
-            float: theta -90 to 90 degrees.
+            float: theta -180 to 180 degrees.
             float: psi -180 to 180 degrees.
         """
         pass
@@ -35,12 +34,12 @@ class SimulationSetup(ABC):
     @abstractmethod
     def angular_velocity(self) -> tuple[float, float, float]:
         """
-        Initial angular velocity (p, q, r) in rad/s.
+        Initial angular velocity (wx, wy, wx) in rad/s.
 
         returns:
-            float: p - velocity around x-axis.
-            float: q - velocity around y-axis.
-            float: r - velocity around z-axis.
+            float: wx - velocity around x-axis.
+            float: wy - velocity around y-axis.
+            float: wz - velocity around z-axis.
         """
         pass
 
@@ -122,15 +121,14 @@ class SimulationSetupReader(SimulationSetup):
     @property
     def euler_angles(self) -> np.ndarray:
         """
-        Initial Euler angles phi, theta, psi. Extrinsic rotation conventions
-        is used: Z-X-Z (or 3-1-3) convention, where the first rotation is
-        around the Z-axis, the second rotation is around the X-axis, and the
-        third rotation is around the Z-axis again. This rotation is supported
-        by scipy rotator library. The angles are in degrees.
+        Initial Euler angles phi, theta, psi. The standard aerospace convention
+        X-Y-Z (known as roll-pitch-yaw) is used, where the first rotation is
+        around the X-axis (roll), the second rotation is around the Y-axis
+        (pitch), and the third rotation is around the Z-axis (yaw).
 
         returns:
             float: phi -180 to 180 degrees.
-            float: theta -90 to 90 degrees.
+            float: theta -180 to 180 degrees.
             float: psi -180 to 180 degrees.
         """
         euler_angles = self._setup["InitialState"][0]["eulerAngles"]
@@ -143,19 +141,19 @@ class SimulationSetupReader(SimulationSetup):
     @property
     def angular_velocity(self) -> np.ndarray:
         """
-        Initial angular velocity (p, q, r) in rad/s.
+        Initial angular velocity (q, r, p) in rad/s.
 
         returns:
-            float: p - velocity around x-axis.
             float: q - velocity around y-axis.
             float: r - velocity around z-axis.
+            float: p - velocity around x-axis.
         """
         omega = self._setup["InitialState"][0]["angularVelocity"]
         p = omega[0]
         q = omega[1]
         r = omega[2]
 
-        return np.array([p, q, r])
+        return np.array([q, r, p])
 
     @property
     def iterations_info(self) -> tuple[int, int, int]:
@@ -167,11 +165,12 @@ class SimulationSetupReader(SimulationSetup):
             int: t_end - end time
             int: t_step - time step
         """
-        t0 = self._setup["Iterations"][0]["start"]
-        tend = self._setup["Iterations"][0]["stop"]
-        tstep = self._setup["Iterations"][0]["step"]
+        data_dict = dict()
+        data_dict['start'] = self._setup["Iterations"][0]["start"]
+        data_dict['stop'] = self._setup["Iterations"][0]["stop"]
+        data_dict['stop'] = self._setup["Iterations"][0]["step"]
 
-        return t0, tend, tstep
+        return data_dict
 
     @property
     def magnetorquer_params(self) -> tuple[int, int]:

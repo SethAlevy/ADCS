@@ -1,9 +1,12 @@
 import numpy as np
 import skyfield
 from scipy.spatial.transform import Rotation as R
+from scipy.integrate import solve_ivp
 
 
-def enu_to_ecef(enu_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
+def enu_to_ecef(
+    enu_vec: np.ndarray, lat_deg: float, lon_deg: float
+) -> np.ndarray:
     """
     Convert a vector from ENU to ECEF.
 
@@ -20,7 +23,9 @@ def enu_to_ecef(enu_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarr
     return enu_to_ecef_rot.apply(enu_vec)
 
 
-def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib.Time) -> np.ndarray:
+def ecef_to_eci(
+    ecef_vec: np.ndarray, time: skyfield.timelib.Time
+) -> np.ndarray:
     """
     Convert a vector from ECEF (Earth-Centered, Earth-Fixed) to ECI (Earth-Centered Inertial) frame.
 
@@ -39,26 +44,43 @@ def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib.Time) -> np.ndarray
     return rot.apply(ecef_vec)
 
 
-def euler_zxz_to_quaternion(z1: float, x: float, z2: float, degrees: bool = True) -> np.ndarray:
+def euler_xyz_to_quaternion(
+    x1: float, y1: float, z1: float, degrees: bool = True
+) -> np.ndarray:
     """
-    Convert Euler angles (Z-X-Z convention) to a quaternion.
+    Convert Euler angles in Z-Y-X convention to a quaternion.
 
     Args:
-        z1 (float): First rotation about Z axis.
-        x (float): Rotation about X axis.
-        z2 (float): Second rotation about Z axis.
+        x1 (float): Rotation about X axis.
+        y1 (float): Rotation about Y axis.
+        z1 (float): Rotation about Z axis.
         degrees (bool): If True, input angles are in degrees. If False, in radians.
 
     Returns:
         np.ndarray: Quaternion as [x, y, z, w] (scipy format).
     """
-    rot = R.from_euler("zxz", [z1, x, z2], degrees=degrees)
+    rot = R.from_euler("xyz", [x1, y1, z1], degrees=degrees)
     return rot.as_quat()
 
 
-def eci_to_sb(vec_eci, quat_sb_from_eci):
+def quaternion_to_euler_xyz(quat):
     """
-    Transform a vector from the ECI frame to the satellite body frame using a quaternion.
+    Convert a quaternion to Euler angles in X-Y-Z convention (degrees).
+
+    Args:
+        quat (np.ndarray): Quaternion in [x, y, z, w] format (scipy convention).
+
+    Returns:
+        np.ndarray: Euler angles [x1, y1, z1] in degrees.
+    """
+    rot = R.from_quat(quat)
+    euler_angles = rot.as_euler("xyz", degrees=True)
+    return euler_angles
+
+
+def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
+    """
+    Transform a vector from the ECI frame to the Satellite Body Frame (SBF) using a quaternion.
 
     Args:
         vec_eci (np.ndarray): Vector in ECI frame (shape: (3,))
@@ -71,3 +93,59 @@ def eci_to_sb(vec_eci, quat_sb_from_eci):
     # The quaternion should represent the rotation from ECI to SB.
     rot = R.from_quat(quat_sb_from_eci)
     return rot.apply(vec_eci)
+
+
+def quat_deriv(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
+    """
+    Compute the quaternion time derivative given angular velocity.
+
+    Args:
+        quaternion (np.ndarray): Quaternion [x, y, z, w], should be normalized.
+        angular_velocity (np.ndarray): Angular velocity [wx, wy, wz] in rad/s (body frame).
+
+    Returns:
+        np.ndarray: Quaternion derivative [x_dot, y_dot, z_dot, w_dot]
+    """
+    omega_quat = np.array([*angular_velocity, 0.0])  # [wx, wy, wz, 0]
+    return 0.5 * quat_multiply(quaternion, omega_quat)
+
+
+def quat_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+    """
+    Hamilton product of two quaternions [x, y, z, w].
+
+    Args:
+        q1 (np.ndarray): First quaternion [x1, y1, z1, w1].
+        q2 (np.ndarray): Second quaternion [x2, y2, z2, w2].
+
+    Returns:
+        np.ndarray: Resulting quaternion [x, y, z, w].
+    """
+    x1, y1, z1, w1 = q1
+    x2, y2, z2, w2 = q2
+    return np.array([
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,
+        w1*w2 - x1*x2 - y1*y2 - z1*z2
+    ])
+
+
+def update_quaternion_by_angular_velocity(
+    quaternion: np.ndarray, angular_velocity: np.ndarray, dt: float
+) -> np.ndarray:
+    """
+    Update the quaternion based on the angular velocity and time step.
+
+    Args:
+        quaternion (np.ndarray): Current quaternion in [x, y, z, w] format.
+        angular_velocity (np.ndarray): Angular velocity in radians/s.
+        dt (float): Time step in seconds.
+
+    Returns:
+        np.ndarray: Updated quaternion in [x, y, z, w] format.
+    """
+    q_dot = quat_deriv(quaternion, angular_velocity)
+    quaternion_new = quaternion + q_dot * dt
+    quaternion_new /= np.linalg.norm(quaternion_new)  # Normalize the quaternion
+    return quaternion_new

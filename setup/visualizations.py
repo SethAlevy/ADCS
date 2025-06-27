@@ -111,3 +111,99 @@ def plot_position(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).
         bbox_inches='tight',
     )
     plt.close()
+
+
+def plot_magnetic_field_sbf(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent) -> None:
+    """
+    Plot the magnetic field of the satellite over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Magnetic Field (nT)', color='tab:blue')
+    ax.plot(state_vector.index, state_vector['mag_field_sbf_x'], color='tab:blue', label='SBF X')
+    ax.plot(state_vector.index, state_vector['mag_field_sbf_y'], color='tab:orange', label='SBF Y')
+    ax.plot(state_vector.index, state_vector['mag_field_sbf_z'], color='tab:green', label='SBF Z')
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Satellite Magnetic Field in SBF')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'magnetic_field_sbf.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+
+
+def plot_magnetic_field_eci(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent) -> None:
+    """
+    Plot the magnetic field of the satellite in ECI over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Magnetic Field (nT)', color='tab:blue')
+    ax.plot(state_vector.index, state_vector['mag_field_eci_x'], color='tab:blue', label='ECI X')
+    ax.plot(state_vector.index, state_vector['mag_field_eci_y'], color='tab:orange', label='ECI Y')
+    ax.plot(state_vector.index, state_vector['mag_field_eci_z'], color='tab:green', label='ECI Z')
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Satellite Magnetic Field in ECI')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'magnetic_field_eci.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+
+
+def plot_angular_velocity(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent) -> None:
+    """
+    Plot the angular velocity of the satellite over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Angular Velocity (deg/s)', color='tab:blue')
+    ax.plot(state_vector.index, state_vector['wx'], color='tab:blue', label='wx')
+    ax.plot(state_vector.index, state_vector['wy'], color='tab:orange', label='wy')
+    ax.plot(state_vector.index, state_vector['wz'], color='tab:green', label='wz')
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Satellite Angular Velocity')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'angular_velocity.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()

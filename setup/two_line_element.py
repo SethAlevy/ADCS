@@ -298,7 +298,9 @@ class TwoLineElementReader(TwoLineElement):
             str: TLE string.
         """
         if not self.tle.exists():
-            raise FileNotFoundError(f"TLE file {self.tle} not found.")
+            raise FileNotFoundError(
+                f"TLE file {self.tle} not found."
+            )
         with open(self.tle, "r") as f:
             lines = f.readlines()
         return lines
