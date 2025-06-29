@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import skyfield.api as skyfield
 from templates.satellite_template import Satellite
 
@@ -45,7 +46,10 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
     # Get the initial position and velocity
     position = satellite.position
     velocity = satellite.linear_velocity
+
     mag_field_sbf, mag_field_eci = satellite.magnetic_field
+    sun_vector_sbf, sun_vector_eci = satellite.sun_vector
+
     euler_angles = satellite.euler_angles
     angular_velocity = satellite.angular_velocity
 
@@ -73,6 +77,12 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
             "mag_field_eci_x": mag_field_eci[0],
             "mag_field_eci_y": mag_field_eci[1],
             "mag_field_eci_z": mag_field_eci[2],
+            "sun_vector_sbf_x": sun_vector_sbf[0],
+            "sun_vector_sbf_y": sun_vector_sbf[1],  
+            "sun_vector_sbf_z": sun_vector_sbf[2],
+            "sun_vector_eci_x": sun_vector_eci[0],
+            "sun_vector_eci_y": sun_vector_eci[1],
+            "sun_vector_eci_z": sun_vector_eci[2],
         },
         index=[0],
     )
@@ -80,7 +90,10 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
     return state_vector
 
 
-def update_state_vector(satellite: Satellite, state_vector: pd.DataFrame) -> pd.DataFrame:
+def update_state_vector(
+        satellite: Satellite,
+        state_vector: pd.DataFrame
+        ) -> pd.DataFrame:
     """
     Update the state vector of the satellite.
 
@@ -98,7 +111,10 @@ def update_state_vector(satellite: Satellite, state_vector: pd.DataFrame) -> pd.
     # Get the new position and velocity
     position = satellite.position
     velocity = satellite.linear_velocity
+
     mag_field_sbf, mag_field_eci = satellite.magnetic_field
+    sun_vector_sbf, sun_vector_eci = satellite.sun_vector
+
     euler_angles = satellite.euler_angles
     angular_velocity = satellite.angular_velocity
 
@@ -125,6 +141,12 @@ def update_state_vector(satellite: Satellite, state_vector: pd.DataFrame) -> pd.
         "mag_field_eci_x": mag_field_eci[0],
         "mag_field_eci_y": mag_field_eci[1],
         "mag_field_eci_z": mag_field_eci[2],
+        "sun_vector_sbf_x": sun_vector_sbf[0],
+        "sun_vector_sbf_y": sun_vector_sbf[1],  
+        "sun_vector_sbf_z": sun_vector_sbf[2],
+        "sun_vector_eci_x": sun_vector_eci[0],
+        "sun_vector_eci_y": sun_vector_eci[1],
+        "sun_vector_eci_z": sun_vector_eci[2],
     }
 
     return state_vector
@@ -147,3 +169,40 @@ def get_lla(satellite: Satellite) -> tuple:
 
     return lat, lon, alt
 
+
+def rad_to_degrees(values: list | np.ndarray) -> np.ndarray:
+    """
+    Convert a list or numpy array of floats from radians to degrees.
+
+    Args:
+        values (list or np.ndarray): Iterable of floats in radians.
+
+    Returns:
+        np.ndarray: Array of floats in degrees.
+    """
+    return np.degrees(values)
+
+
+def degrees_to_rad(values: list | np.ndarray) -> np.ndarray:
+    """
+    Convert a list or numpy array of floats from degrees to radians.
+
+    Args:
+        values (list or np.ndarray): Iterable of floats in degrees.
+
+    Returns:
+        np.ndarray: Array of floats in radians.
+    """
+    return np.radians(values)
+
+
+def normalize(v):
+    return v / np.linalg.norm(v)
+
+
+def skew_symmetric(v):
+    return np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0]
+    ])

@@ -177,7 +177,10 @@ def plot_magnetic_field_eci(state_vector: pd.DataFrame, output_dir: Path = Path(
     plt.close()
 
 
-def plot_angular_velocity(state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent) -> None:
+def plot_angular_velocity(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
     """
     Plot the angular velocity of the satellite over time.
 

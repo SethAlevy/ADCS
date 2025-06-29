@@ -2,7 +2,9 @@ from templates.satellite_template import Satellite
 import numpy as np
 from setup.two_line_element import TwoLineElement
 from setup.initial_settings import SimulationSetup
-from templates.magnetic_template import Magnetometer
+from templates.sensors_template import Magnetometer
+from templates.sensors_template import Sunsensor
+from templates.sensors_template import SensorFusion
 import skyfield.api as skyfield
 import setup.utilities as ut
 import setup.transformations as tr
@@ -18,6 +20,8 @@ class SatelliteImplementation(Satellite):
         setup: SimulationSetup,
         tle: TwoLineElement,
         magnetometer: Magnetometer,
+        sunsensor: Sunsensor,
+        sensor_fusion: SensorFusion
     ):
         """
         Initialize the satellite using json file and TLE file.
@@ -25,10 +29,15 @@ class SatelliteImplementation(Satellite):
         self.setup = setup
         self._angular_velocity = self.setup.angular_velocity
         self._euler_angles = self.setup.euler_angles
+        self._quaternion = tr.euler_xyz_to_quaternion(self._euler_angles)
+        self._quaternion = self._quaternion / np.linalg.norm(self._quaternion)
+
         self._iteration = self.setup.iterations_info["start"]
 
         self._two_line_element = tle
         self.magnetometer = magnetometer
+        self.sunsensor = sunsensor
+        self.sensor_fusion = sensor_fusion
 
         self._satellite_model = skyfield.EarthSatellite(
             self.two_line_element.line_1, self.two_line_element.line_2
@@ -155,32 +164,25 @@ class SatelliteImplementation(Satellite):
 
         Args:
             angular_velocity (np.ndarray): Angular velocity of the satellite
-            in degrees/second. Choosen convention is to keep the angles
+            in degrees/second. Chosen convention is to keep the angles
             in [-180, 180).
 
         Returns:
             np.ndarray: Updated Euler angles of the satellite in degrees.
-        """
-        new_euler = self._euler_angles + self.angular_velocity
-        # Keep first and third angles in [-180, 180)
-        new_euler[0] = ((new_euler[0] + 180) % 360) - 180
-        new_euler[2] = ((new_euler[2] + 180) % 360) - 180
-        # Keep the second angle in [-90, 90]
-        new_euler[1] = np.clip(new_euler[1], -90, 90)
+        """ 
+        new_euler = tr.quaternion_to_euler_xyz(self.quaternion)
         self._euler_angles = new_euler
         return new_euler
 
     @property
     def quaternion(self) -> np.ndarray:
         """
-        Convert the Euler angles to a quaternion.
+        Quaternion of the satellite.
 
         Returns:
             np.ndarray: Quaternion of the satellite.
         """
-        return tr.euler_xyz_to_quaternion(
-            self.euler_angles[0], self.euler_angles[1], self.euler_angles[2]
-        )
+        return self._quaternion
 
     @property
     def two_line_element(self) -> TwoLineElement:
@@ -189,11 +191,102 @@ class SatelliteImplementation(Satellite):
     @property
     def magnetic_field(self) -> np.ndarray:
         """
-        Get the magnetic field vector at the satellite's position in the SBF and ECI frames.
-        The second is rather for debugging purposes. Both are in nT (nanoTesla).
+        Get the magnetic field vector at the satellite's position in the SBF and
+        ECI frames. The second is rather for debugging purposes. Both are in nT
+        (nanoTesla).
 
         Returns:
             np.ndarray: Magnetic field vector in the SBF and ECI frames.
         """
         julian_date = ut.time_julian_date(self)
         return self.magnetometer.simulate_magnetometer(self, julian_date)
+    
+    @property
+    def sun_vector(self) -> np.ndarray:
+        """
+        Get the Sun vector in the ECI frame at the current simulation time.
+
+        Returns:
+            np.ndarray: Sun vector in the SB frame.
+        """
+        julian_date = ut.time_julian_date(self)
+        return self.sunsensor.simulate_sunsensor(self, julian_date)
+
+    def apply_rotation_test(self):
+        """
+        Apply the rotation to the satellite's position and velocity.
+        This method updates the satellite's position and velocity based on
+        the current quaternion angles and angular velocity.
+        """
+        # Update the quaternion based on the angular velocity
+        quaternion = tr.update_quaternion_by_angular_velocity(
+            self._quaternion,
+            ut.degrees_to_rad(self.angular_velocity)
+        )
+        return quaternion
+    
+    def apply_rotation(self):
+        """
+        Apply the rotation to the satellite's position and velocity.
+        This method updates the satellite's position and velocity based on
+        the current quaternion angles and angular velocity.
+        """
+        # Update the quaternion based on the angular velocity
+        self._quaternion = tr.update_quaternion_by_angular_velocity(
+            self._quaternion,
+            ut.degrees_to_rad(self.angular_velocity)
+        )
+
+    def apply_triad(
+            self,
+            v1_i: np.ndarray,
+            v2_i: np.ndarray,
+            v1_b: np.ndarray,
+            v2_b: np.ndarray
+    ) -> None:
+        """
+        Apply the TRIAD algorithm for attitude determination of two sensors.
+        This method computes the quaternion from inertial to body frame
+        using two vectors in both frames. The first vector is typically the more
+        accurate.
+
+        Args:
+            v1_i (np.ndarray): First vector in inertial frame.
+            v2_i (np.ndarray): Second vector in inertial frame.
+            v1_b (np.ndarray): First vector in body frame.
+            v2_b (np.ndarray): Second vector in body frame.
+        """
+        self._quaternion = self.sensor_fusion.triad(v1_i, v2_i, v1_b, v2_b)
+    
+    def apply_quest(self,
+            v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
+    ) -> None:
+        """
+        Apply the QUEST algorithm for attitude determination of two sensors.
+        This method computes the quaternion from inertial to body frame
+        using two vectors in both frames. The first vector is typically the more
+        accurate.
+
+        Args:
+            v1_i (np.ndarray): First vector in inertial frame.
+            v2_i (np.ndarray): Second vector in inertial frame.
+            v1_b (np.ndarray): First vector in body frame.
+            v2_b (np.ndarray): Second vector in body frame.
+        """
+        self._quaternion = self.sensor_fusion.quest(v_b_list, v_i_list)
+    
+    def apply_ekf(
+            self,
+            v_b_list: list[np.ndarray],
+            v_i_list: list[np.ndarray],
+    ) -> None:
+        """
+        Apply the Extended Kalman Filter (EKF) for attitude estimation.
+        
+        Args:
+            v_b_list (list[np.ndarray]): Body-frame unit vectors.
+            v_i_list (list[np.ndarray]): Inertial-frame unit vectors.
+        """
+        angular_velocity_rad = ut.degrees_to_rad(self.angular_velocity)
+        self._quaternion = self.sensor_fusion.ekf(v_b_list, v_i_list, angular_velocity_rad, 1, self.quaternion)
+                    

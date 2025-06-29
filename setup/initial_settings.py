@@ -153,7 +153,7 @@ class SimulationSetupReader(SimulationSetup):
         q = omega[1]
         r = omega[2]
 
-        return np.array([q, r, p])
+        return np.array([p, q, r])
 
     @property
     def iterations_info(self) -> tuple[int, int, int]:
