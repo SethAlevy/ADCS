@@ -5,15 +5,20 @@ import skyfield.timelib
 
 
 def enu_to_ecef(
-    enu_vec: np.ndarray, lat_deg: float, lon_deg: float
+    enu_vec: np.ndarray,
+    lat_deg: float,
+    lon_deg: float
 ) -> np.ndarray:
     """
-    Convert a vector from ENU to ECEF.
+    Convert a vector from ENU (East-North-Up) to ECEF (Earth-Centered, Earth-Fixed).
 
     Args:
-        enu_vec (np.ndarray): Vector in ENU frame (shape: (3,))
+        enu_vec (np.ndarray): Vector in ENU frame.
         lat_deg (float): Latitude in degrees.
         lon_deg (float): Longitude in degrees.
+
+    Returns:
+        np.ndarray: Vector in ECEF frame.
     """
     lat = np.deg2rad(lat_deg)
     lon = np.deg2rad(lon_deg)
@@ -24,18 +29,19 @@ def enu_to_ecef(
 
 
 def ecef_to_eci(
-    ecef_vec: np.ndarray, time: skyfield.timelib
+    ecef_vec: np.ndarray,
+    time: skyfield.timelib
 ) -> np.ndarray:
     """
     Convert a vector from ECEF (Earth-Centered, Earth-Fixed) to ECI
     (Earth-Centered Inertial) frame.
 
     Args:
-        ecef_vec (np.ndarray): Vector in ECEF frame (shape: (3,))
-        time (skyfield.timelib): Skyfield Time object (UTC or TT)
+        ecef_vec (np.ndarray): Vector in ECEF frame.
+        time (skyfield.timelib): Skyfield Time object (UTC or TT).
 
     Returns:
-        np.ndarray: Vector in ECI frame (shape: (3,))
+        np.ndarray: Vector in ECI frame.
     """
     # Get GAST (Greenwich Apparent Sidereal Time) in radians
     gast_rad = time.gast * np.pi / 12  # GAST in hours, convert to radians
@@ -49,14 +55,14 @@ def euler_xyz_to_quaternion(
     euler_angles: np.ndarray, degrees: bool = True
 ) -> np.ndarray:
     """
-    Convert Euler angles in Z-Y-X convention to a quaternion.
+    Convert Euler angles in X-Y-Z convention to a quaternion.
 
     Args:
         euler_angles (np.ndarray): Euler angles [x1, y1, z1] in degrees or radians.
         degrees (bool): If True, input angles are in degrees. If False, in radians.
 
     Returns:
-        np.ndarray: Quaternion as [x, y, z, w] (scipy format).
+        np.ndarray: Quaternion as [x, y, z, w].
     """
     rot = R.from_euler("xyz", euler_angles, degrees=degrees)
     return rot.as_quat()
@@ -67,7 +73,7 @@ def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
     Convert a quaternion to Euler angles in X-Y-Z convention (degrees).
 
     Args:
-        quat (np.ndarray): Quaternion in [x, y, z, w] format (scipy convention).
+        quat (np.ndarray): Quaternion in [x, y, z, w] format.
 
     Returns:
         np.ndarray: Euler angles [x1, y1, z1] in degrees.
@@ -79,18 +85,17 @@ def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
 
 def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     """
-    Transform a vector from the ECI frame to the Satellite Body Frame (SBF)
-    using a quaternion.
+    Transform a vector from the ECI (Earth-Centered Inertial) frame to the SBF
+    (Satellite Body Frame) using a quaternion.
 
     Args:
-        vec_eci (np.ndarray): Vector in ECI frame (shape: (3,))
+        vec_eci (np.ndarray): Vector in ECI frame.
         quat_sb_from_eci (np.ndarray): Quaternion representing rotation from ECI to
-            satellite body frame, in [x, y, z, w] format (scipy convention).
+            satellite body frame, in [x, y, z, w] format.
 
     Returns:
-        np.ndarray: Vector in satellite body frame (shape: (3,))
+        np.ndarray: Vector in satellite body frame.
     """
-    # The quaternion should represent the rotation from ECI to SB.
     rot = R.from_quat(quat_sb_from_eci)
     return rot.apply(vec_eci)
 
@@ -165,7 +170,7 @@ def rotation_matrix_to_quaternion(
         np.ndarray: Quaternion in [x, y, z, w] format.
     """
     rot = R.from_matrix(rotation_matrix)
-    return rot.as_quat()  # [x, y, z, w]
+    return rot.as_quat()
 
 
 def rotate_vector_by_quaternion(
@@ -175,11 +180,11 @@ def rotate_vector_by_quaternion(
     Rotate a vector by a quaternion.
 
     Args:
-        vector (np.ndarray): Vector to be rotated (shape: (3,)).
+        vector (np.ndarray): Vector to be rotated.
         quaternion (np.ndarray): Quaternion in [x, y, z, w] format.
 
     Returns:
-        np.ndarray: Rotated vector (shape: (3,)).
+        np.ndarray: Rotated vector.
     """
     rot = R.from_quat(quaternion)
     return rot.apply(vector)

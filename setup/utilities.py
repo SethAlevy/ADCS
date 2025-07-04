@@ -5,17 +5,15 @@ from templates.satellite_template import Satellite
 
 
 def time_julian_date(satellite: Satellite) -> skyfield.Time:
-    # sourcery skip: inline-immediately-returned-variable
     """
     Convert the current epoch to Julian Date. Current date is the epoch
-    of the TLE plus the number of seconds from simulation start. The
-    Julian Date is a continuous count of days since the beginning of the Julian
+    of the TLE plus the number of seconds from simulation start as a fraction of a day.
+    The Julian Date is a continuous count of days since the beginning of the Julian
     Period on January 1, 4713 BC at noon. It is used in astronomy
     and other fields to provide a uniform time scale for calculations.
 
     Args:
-        satellite (Satelliten): The satellite object containing
-        the TLE data.
+        satellite (Satellite): The satellite object containing the TLE data.
 
     Returns:
         skyfield.Time: The Julian Date corresponding to the current epoch.
@@ -36,12 +34,12 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
 
     Args:
         satellite (Satellite): The satellite object containing
-        the TLE data and current status.
+            the TLE data and current status.
 
     Returns:
         pd.DataFrame: A DataFrame containing the initial state vector of the
-        satellite. The state vector includes position, velocity (both x, y and
-        z in GCRS), latitude, longitude and altitude.
+            satellite. The state vector includes position, velocity, latitude,
+            longitude and altitude etc.
     """
     # Get the initial position and velocity
     position = satellite.position
@@ -78,7 +76,7 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
             "mag_field_eci_y": mag_field_eci[1],
             "mag_field_eci_z": mag_field_eci[2],
             "sun_vector_sbf_x": sun_vector_sbf[0],
-            "sun_vector_sbf_y": sun_vector_sbf[1],  
+            "sun_vector_sbf_y": sun_vector_sbf[1],
             "sun_vector_sbf_z": sun_vector_sbf[2],
             "sun_vector_eci_x": sun_vector_eci[0],
             "sun_vector_eci_y": sun_vector_eci[1],
@@ -93,20 +91,20 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
 def update_state_vector(
         satellite: Satellite,
         state_vector: pd.DataFrame
-        ) -> pd.DataFrame:
+) -> pd.DataFrame:
     """
     Update the state vector of the satellite.
 
     Args:
         satellite (Satellite): The satellite object containing
-        the TLE data and current status.
+            the TLE data and current status.
         state_vector (pd.DataFrame): The DataFrame containing the current state
-        vector of the satellite.
+            vector of the satellite.
 
     Returns:
         pd.DataFrame: A DataFrame containing the updated state vector of the
-        satellite. The state vector includes position, velocity (both x, y and
-        z in GCRS), latitude, longitude and altitude.
+            satellite. The state vector includes position, velocity, latitude,
+            longitude and altitude etc.
     """
     # Get the new position and velocity
     position = satellite.position
@@ -142,7 +140,7 @@ def update_state_vector(
         "mag_field_eci_y": mag_field_eci[1],
         "mag_field_eci_z": mag_field_eci[2],
         "sun_vector_sbf_x": sun_vector_sbf[0],
-        "sun_vector_sbf_y": sun_vector_sbf[1],  
+        "sun_vector_sbf_y": sun_vector_sbf[1],
         "sun_vector_sbf_z": sun_vector_sbf[2],
         "sun_vector_eci_x": sun_vector_eci[0],
         "sun_vector_eci_y": sun_vector_eci[1],
@@ -158,7 +156,7 @@ def get_lla(satellite: Satellite) -> tuple:
 
     Args:
         satellite (Satellite): The satellite object containing
-        the TLE data and current status.
+            the TLE data and current status.
 
     Returns:
         tuple: latitude, longitude and altitude of the satellite.
@@ -196,11 +194,28 @@ def degrees_to_rad(values: list | np.ndarray) -> np.ndarray:
     return np.radians(values)
 
 
-def normalize(v):
+def normalize(v: np.ndarray) -> np.ndarray:
+    """
+    Normalize a vector to unit length.
+    Args:
+        v (np.ndarray): Input vector.
+
+    Returns:
+        np.ndarray: Normalized vector.
+    """
     return v / np.linalg.norm(v)
 
 
-def skew_symmetric(v):
+def skew_symmetric(v: np.ndarray) -> np.ndarray:
+    """
+    Compute the skew-symmetric matrix of a 3D vector.
+
+    Args:
+        v (np.ndarray): Input vector.
+
+    Returns:
+        np.ndarray: Skew-symmetric matrix.
+    """
     return np.array([
         [0, -v[2], v[1]],
         [v[2], 0, -v[0]],

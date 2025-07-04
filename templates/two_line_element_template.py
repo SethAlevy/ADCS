@@ -1,38 +1,14 @@
-from pathlib import Path
-from templates.two_line_element_template import TwoLineElement
+from abc import ABC
+from abc import abstractmethod
 
 
-class TwoLineElementReader(TwoLineElement):
+class TwoLineElement(ABC):
     """
-    Class for reading two-line elements (TLE) from a file.
+    Abstract class for two-line elements (TLE).
     """
 
-    def __init__(self, tle_txt: Path):
-        """
-        Initialize the TLE reader with the given filename.
-
-        Args:
-            filename (Path): Path to the TLE txt file.
-        """
-        self.tle = tle_txt
-
-    def read_tle(self) -> list[str]:
-        """
-        Read the TLE from the file.
-
-        Returns:
-            str: TLE string.
-        """
-        if not self.tle.exists():
-            raise FileNotFoundError(
-                f"TLE file {self.tle} not found."
-            )
-        with open(self.tle, "r") as f:
-            lines = f.readlines()
-        return lines
-
-    # TODO add checksum validation
     @property
+    @abstractmethod
     def line_1(self) -> str:
         """
         First line of the TLE.
@@ -40,9 +16,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: First line of the TLE.
         """
-        return self.read_tle()[0]
+        pass
 
     @property
+    @abstractmethod
     def line_2(self) -> str:
         """
         Second line of the TLE.
@@ -50,19 +27,22 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: Second line of the TLE.
         """
-        return self.read_tle()[1]
+        pass
 
     @property
-    def satellite_name(self) -> str:
+    @abstractmethod
+    def satellite_name(self) -> int:
         """
-        Name of the satellite (Satellite Catalog Number).
+        Name of the satellite (Satellite Catalog Number) is a 9-digit number
+        assigned to each satellite by the United States Space Command (USSC).
 
         Returns:
-            str: 9-digit number.
+            int: 9-digit number.
         """
-        return self.line_1[2:7]
+        pass
 
     @property
+    @abstractmethod
     def classification(self) -> str:
         """
         Classification of the satellite (e.g., "U" for unclassified).
@@ -70,9 +50,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: Classification of the satellite.
         """
-        return self.line_1[7]
+        pass
 
     @property
+    @abstractmethod
     def launch_year(self) -> int:
         """
         Launch year of the satellite.
@@ -80,9 +61,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Two last digits of the launch year.
         """
-        return int(self.line_1[9:11])
+        pass
 
     @property
+    @abstractmethod
     def launch_number(self) -> int:
         """
         Launch number of the satellite in the given year.
@@ -90,9 +72,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: 3-digit launch number of the satellite.
         """
-        return int(self.line_1[11:14])
+        pass
 
     @property
+    @abstractmethod
     def piece_launch(self) -> str:
         """
         Piece of the launch.
@@ -100,9 +83,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             str: 3-digit piece of the launch.
         """
-        return self.line_1[14:17]
+        pass
 
     @property
+    @abstractmethod
     def epoch_year(self) -> int:
         """
         Epoch year of the TLE, representing the time at which the orbital
@@ -111,9 +95,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Two last digits of the year. May skip the first 0.
         """
-        return int(self.line_1[18:20])
+        pass
 
     @property
+    @abstractmethod
     def epoch_day(self) -> float:
         """
         Epoch day of the TLE, representing the time at which the orbital
@@ -122,9 +107,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Day of the year.
         """
-        return float(self.line_1[20:32])
+        pass
 
     @property
+    @abstractmethod
     def mean_motion_derivative_1(self) -> float:
         """
         First derivative of the mean motion also known as the ballistic
@@ -133,9 +119,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: First derivative of the mean motion.
         """
-        return float(self.line_1[33:43])
+        pass
 
     @property
+    @abstractmethod
     def mean_motion_derivative_2(self) -> float:
         """
         Second derivative of the mean motion.
@@ -143,9 +130,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Second derivative of the mean motion.
         """
-        return float(self.line_1[44:52])
+        pass
 
     @property
+    @abstractmethod
     def bstar_drag(self) -> float:
         """
         BSTAR is a way of modeling satellite aerodynamic drag used in the
@@ -155,10 +143,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: BSTAR drag term.
         """
-        # TODO add conversion to float
-        return str(self.line_1[53:61])
+        pass
 
     @property
+    @abstractmethod
     def ephemeris_type(self) -> int:
         """
         Ephemeris type of the TLE.
@@ -166,9 +154,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Usually 0.
         """
-        return int(self.line_1[62])
+        pass
 
     @property
+    @abstractmethod
     def element_number(self) -> int:
         """
         Element set number of the TLE.
@@ -176,9 +165,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: 3-digit number.
         """
-        return int(self.line_1[64:68])
+        pass
 
     @property
+    @abstractmethod
     def checksum_line1(self) -> int:
         """
         Checksum of the first line of the TLE.
@@ -186,9 +176,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Checksum of the first line.
         """
-        return int(self.line_1[68])
+        pass
 
     @property
+    @abstractmethod
     def inclination(self) -> float:
         """
         Inclination of the satellite orbit in degrees. Angle between the
@@ -197,9 +188,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Positive value in degrees.
         """
-        return float(self.line_2[8:16])
+        pass
 
     @property
+    @abstractmethod
     def raan(self) -> float:
         """
         Right Ascension of Ascending Node (RAAN) in degrees. The angle
@@ -208,9 +200,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line_2[17:25])
+        pass
 
     @property
+    @abstractmethod
     def eccentricity(self) -> float:
         """
         Eccentricity of the satellite orbit. A measure of how much the orbit
@@ -220,9 +213,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Eccentricity value between 0 and 1.
         """
-        return float(f"0.{self.line_2[26:33]}")
+        pass
 
     @property
+    @abstractmethod
     def argument_of_perigee(self) -> float:
         """
         Argument of perigee in degrees. The angle between the ascending node
@@ -231,9 +225,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line_2[34:43])
+        pass
 
     @property
+    @abstractmethod
     def mean_anomaly(self) -> float:
         """
         Mean anomaly in degrees. The angle between the perigee and the
@@ -242,9 +237,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Angle from 0 to 360 degrees.
         """
-        return float(self.line_2[43:51])
+        pass
 
     @property
+    @abstractmethod
     def mean_motion(self) -> float:
         """
         Mean motion in revolutions per day. The number of orbits the
@@ -253,9 +249,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             float: Number of revolutions per day.
         """
-        return float(self.line_2[52:63])
+        pass
 
     @property
+    @abstractmethod
     def revolution_number(self) -> int:
         """
         Revolution number at epoch. The number of orbits the satellite has
@@ -264,9 +261,10 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Revolution number.
         """
-        return int(self.line_2[63:68])
+        pass
 
     @property
+    @abstractmethod
     def checksum_line2(self) -> int:
         """
         Checksum of the second line of the TLE.
@@ -274,4 +272,4 @@ class TwoLineElementReader(TwoLineElement):
         Returns:
             int: Checksum of the second line.
         """
-        return int(self.line_2[68])
+        pass
