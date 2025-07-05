@@ -181,7 +181,8 @@ class Satellite(ABC):
         magnetometer object.
 
         Returns:
-            np.ndarray: Magnetic field vector in the SBF and ECI frames.
+            np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
+            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
         pass
 
@@ -193,7 +194,8 @@ class Satellite(ABC):
         the altitude is neglected. Only a rotation from ECI to SBF is applied.
 
         Returns:
-            np.ndarray: Sun vector in the SBF and ECI frames.
+            np.ndarray: Sun vector in the SBF and ECI frames in form of
+            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
         pass
 

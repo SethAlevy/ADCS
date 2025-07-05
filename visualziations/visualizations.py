@@ -301,13 +301,13 @@ def plot_euler_angles(
     )
     ax.plot(
         state_vector.index,
-        state_vector['euler_x2'],
+        state_vector['euler_y1'],
         color='tab:orange',
         label='pitch (Theta)'
     )
     ax.plot(
         state_vector.index,
-        state_vector['euler_x3'],
+        state_vector['euler_z1'],
         color='tab:green',
         label='yaw (Psi)'
     )

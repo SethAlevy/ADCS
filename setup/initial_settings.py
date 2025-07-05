@@ -74,18 +74,20 @@ class SimulationSetupReader(SimulationSetup):
         return data_dict
 
     @property
-    def magnetorquer_params(self) -> tuple[int, int]:
+    def magnetorquer_params(self) -> tuple[int, int, float]:
         """
-        Magnetorquer parameters (n, A), works for every axis of rotation.
+        Magnetorquer parameters (n, A, maxI), works for every axis of rotation.
 
         returns:
             int: n_coils - number of coils.
             int: coil_area - area of each coil in m^2.
+            float: max_current - maximum current in A.
         """
         n_coils = self._setup["Magnetorquer"][0]["n"]
         coil_area = self._setup["Magnetorquer"][0]["A"]
+        max_current = self._setup["Magnetorquer"][0]["maxI"]
 
-        return n_coils, coil_area
+        return n_coils, coil_area, max_current
 
     @property
     def satellite_params(self) -> tuple[int, np.ndarray]:

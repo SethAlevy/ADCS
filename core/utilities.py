@@ -221,3 +221,33 @@ def skew_symmetric(v: np.ndarray) -> np.ndarray:
         [v[2], 0, -v[0]],
         [-v[1], v[0], 0]
     ])
+
+
+def filter_significant_digits(array: np.ndarray, sig_digits: int) -> np.ndarray:
+    """
+    Filter the array to have a specified number of significant digits.
+
+    Args:
+        array (np.ndarray): Input array of floats.
+        sig_digits (int): Number of significant digits to retain.
+
+    Returns:
+        np.ndarray: Array with values formatted to the specified significant digits.
+    """
+    format_str = f"{{:.{sig_digits-1}e}}"  # Scientific notation
+    return np.array([float(format_str.format(x)) for x in array])
+
+
+def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
+    """
+    Round each element to specified number of decimal places
+    
+    Args:
+        array (np.ndarray): Input numpy array or list
+        decimal_places (int): Number of decimal places to keep
+
+    Returns:
+        np.ndarray: Filtered array with specified precision
+    """
+    return np.round(array, decimal_places)
+

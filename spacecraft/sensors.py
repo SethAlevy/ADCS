@@ -3,8 +3,8 @@ import numpy as np
 import datetime as dt
 import skyfield.api as skyfield
 from scipy.linalg import eig
-import setup.transformations as tr
-import setup.utilities as ut
+import core.transformations as tr
+import core.utilities as ut
 from templates.satellite_template import Satellite
 from scipy.spatial.transform import Rotation as R
 

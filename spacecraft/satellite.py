@@ -1,13 +1,14 @@
 from templates.satellite_template import Satellite
 import numpy as np
 from setup.two_line_element import TwoLineElement
+from spacecraft.actuator import MagnetorquerImplemetation
 from templates.initial_settings_template import SimulationSetup
 from templates.sensors_template import Magnetometer
 from templates.sensors_template import Sunsensor
 from templates.sensors_template import SensorFusion
 import skyfield.api as skyfield
-import setup.utilities as ut
-import setup.transformations as tr
+import core.utilities as ut
+import core.transformations as tr
 
 
 class SatelliteImplementation(Satellite):
@@ -22,6 +23,7 @@ class SatelliteImplementation(Satellite):
         magnetometer: Magnetometer = None,
         sunsensor: Sunsensor = None,
         sensor_fusion: SensorFusion = None,
+        round_filter: bool = False
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -45,30 +47,34 @@ class SatelliteImplementation(Satellite):
                 SBF (Satellite Body Frame) and ECI (Earth-Centered Inertial)
             sensor_fusion (SensorFusion, optional): SensorFusion object for
                 performing sensor fusion algorithms such as TRIAD, QUEST, or EKF.
+            round_filter (bool): If True, applies a rounding filter to the
+                satellite's parameters to reduce numerical noise. Defaults to True.
         """
         self.setup = setup
         self._angular_velocity = self.setup.angular_velocity
         self._euler_angles = self.setup.euler_angles
+        self._iteration = self.setup.iterations_info["start"]
+        self.round_filter = round_filter
 
         # quaternions are a very useful way to represent rotations, use the initial
         # Euler angles to calculate the initial quaternion
         self._quaternion = tr.euler_xyz_to_quaternion(self._euler_angles)
         self._quaternion = self._quaternion / np.linalg.norm(self._quaternion)
 
-        self._iteration = self.setup.iterations_info["start"]
-
         self._two_line_element = tle
+
+        # initialize the satellite model using skyfield library
+        self._satellite_model = skyfield.EarthSatellite(
+            self.two_line_element.line_1, self.two_line_element.line_2
+        )
+
         if magnetometer is not None:
             self.magnetometer = magnetometer
         if sunsensor is not None:
             self.sunsensor = sunsensor
 
         self.sensor_fusion = sensor_fusion
-
-        # initialize the satellite model using skyfield library
-        self._satellite_model = skyfield.EarthSatellite(
-            self.two_line_element.line_1, self.two_line_element.line_2
-        )
+        self.magnetorquer = MagnetorquerImplemetation(self.setup, self)
 
     def update_iteration(self, iteration: int) -> None:
         """
@@ -93,14 +99,14 @@ class SatelliteImplementation(Satellite):
         """
         Mass of the satellite in kg.
         """
-        return self.setup.satellite_params[0]
+        return self.setup.satellite_params[1]
 
     @property
     def inertia_matrix(self) -> np.ndarray:
         """
         Inertia matrix of the satellite in kg*m^2.
         """
-        return self.setup.satellite_params[1]
+        return self.setup.satellite_params[0]
 
     @property
     def position(self) -> np.ndarray:
@@ -116,7 +122,11 @@ class SatelliteImplementation(Satellite):
                 iteration.
         """
         julian_date = ut.time_julian_date(self)
-        return self._satellite_model.at(julian_date).position.km
+        position = self._satellite_model.at(julian_date).position.km
+        if self.round_filter:
+            position = ut.filter_significant_digits(position, 3)
+        position = ut.filter_decimal_places(position, 3)
+        return position
 
     @property
     def linear_velocity(self) -> np.ndarray:
@@ -132,7 +142,10 @@ class SatelliteImplementation(Satellite):
                 iteration.
         """
         julian_date = ut.time_julian_date(self)
-        return self._satellite_model.at(julian_date).velocity.km_per_s
+        velocity = self._satellite_model.at(julian_date).velocity.km_per_s
+        if self.round_filter:
+            velocity = ut.filter_significant_digits(velocity, 3)
+        return velocity
 
     @property
     def latitude(self) -> float:
@@ -145,7 +158,10 @@ class SatelliteImplementation(Satellite):
         """
         julian_date = ut.time_julian_date(self)
         latlon = skyfield.wgs84.latlon_of(self._satellite_model.at(julian_date))
-        return latlon[0].degrees
+        latitude = latlon[0].degrees
+        if self.round_filter:
+            latitude = ut.filter_decimal_places(latitude, 2)
+        return latitude
 
     @property
     def longitude(self) -> float:
@@ -157,9 +173,11 @@ class SatelliteImplementation(Satellite):
             float: Longitude of the satellite in degrees.
         """
         julian_date = ut.time_julian_date(self)
-        return skyfield.wgs84.latlon_of(self._satellite_model.at(julian_date))[
-            1
-        ].degrees
+        latlon = skyfield.wgs84.latlon_of(self._satellite_model.at(julian_date))
+        longitude = latlon[1].degrees
+        if self.round_filter:
+            longitude = ut.filter_decimal_places(longitude, 2)
+        return longitude
 
     @property
     def altitude(self) -> float:
@@ -173,7 +191,10 @@ class SatelliteImplementation(Satellite):
         julian_date = ut.time_julian_date(self)
         geocentric = self._satellite_model.at(julian_date)
         # .subpoint().elevation gives altitude in meters; convert to km
-        return geocentric.subpoint().elevation.m / 1000.0
+        altitude = geocentric.subpoint().elevation.m / 1000.0
+        if self.round_filter:
+            altitude = ut.filter_decimal_places(altitude, 3)
+        return altitude
 
     @property
     def angular_velocity(self) -> np.ndarray:
@@ -186,6 +207,8 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Angular velocity of the satellite in degrees/s.
         """
         new_velocity = self._angular_velocity
+        if self.round_filter:
+            new_velocity = ut.filter_decimal_places(new_velocity, 2)
         self._angular_velocity = new_velocity
         return new_velocity
 
@@ -205,6 +228,8 @@ class SatelliteImplementation(Satellite):
                 (roll, pitch and yaw).
         """
         new_euler = tr.quaternion_to_euler_xyz(self.quaternion)
+        if self.round_filter:
+            new_euler = ut.filter_decimal_places(new_euler, 2)
         self._euler_angles = new_euler
         return new_euler
 
@@ -233,6 +258,9 @@ class SatelliteImplementation(Satellite):
         Two-line element set (TLE) of the satellite. Imported from file
         as object. Allows to access the parameters describing the satellite's
         orbital parameters such as inclination, right ascension etc.
+
+        Returns:
+            TwoLineElement: TLE object containing the orbital parameters.
         """
         return self._two_line_element
 
@@ -246,10 +274,15 @@ class SatelliteImplementation(Satellite):
         magnetometer object.
 
         Returns:
-            np.ndarray: Magnetic field vector in the SBF and ECI frames.
+            np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
+            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
         julian_date = ut.time_julian_date(self)
-        return self.magnetometer.simulate_magnetometer(self, julian_date)
+        mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(self, julian_date)
+        if self.round_filter:
+            mag_sbf = ut.filter_significant_digits(mag_sbf, 4)
+            mag_eci = ut.filter_significant_digits(mag_eci, 4)
+        return mag_sbf, mag_eci
 
     @property
     def sun_vector(self) -> np.ndarray:
@@ -258,10 +291,15 @@ class SatelliteImplementation(Satellite):
         the altitude is neglected. Only a rotation from ECI to SBF is applied.
 
         Returns:
-            np.ndarray: Sun vector in the SBF and ECI frames.
+            np.ndarray: Sun vector in the SBF and ECI frames in form of
+            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
         julian_date = ut.time_julian_date(self)
-        return self.sunsensor.simulate_sunsensor(self, julian_date)
+        sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
+        if self.round_filter:
+            sun_sbf = ut.filter_significant_digits(sun_sbf, 5)
+            sun_eci = ut.filter_significant_digits(sun_eci, 5)
+        return sun_sbf, sun_eci
 
     def apply_rotation(self) -> None:
         """
@@ -274,23 +312,6 @@ class SatelliteImplementation(Satellite):
             self._quaternion,
             ut.degrees_to_rad(self.angular_velocity)
         )
-
-    def apply_rotation_test(self) -> np.ndarray:
-        """
-        This method updates the satellite's orientation based on the
-        current angular velocity. This time the quaternion is not
-        assigned, but only returned. It is more for getting the reference
-        without updating the satellite object.
-
-        Returns:
-            np.ndarray: rotated quaternion.
-        """
-        # Update the quaternion based on the angular velocity
-        quaternion = tr.update_quaternion_by_angular_velocity(
-            self._quaternion,
-            ut.degrees_to_rad(self.angular_velocity)
-        )
-        return quaternion
 
     def apply_triad(
             self,
@@ -357,3 +378,21 @@ class SatelliteImplementation(Satellite):
             1,
             self.quaternion
         )
+
+    def apply_detumbling(
+            self,
+            method: str,
+    ) -> np.ndarray:
+        """
+        Perform detumbling using the specified method.
+        """
+        if method == "b_dot":
+            angular_acceleration = self.magnetorquer.b_dot(self.magnetic_field[0], 1)
+        else:
+            raise ValueError(f"Unknown detumbling method: {method}")
+        self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
+            angular_acceleration
+        )
+        if self.iteration % 100 == 0:
+            print(f"Angular acceleration applied: {np.linalg.norm(ut.rad_to_degrees(angular_acceleration))}")
+            print(f"New angular velocity: {np.linalg.norm(self.angular_velocity)}")
