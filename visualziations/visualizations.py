@@ -262,6 +262,12 @@ def plot_angular_velocity(
     ax.plot(state_vector.index, state_vector['wy'], color='tab:orange', label='wy')
     ax.plot(state_vector.index, state_vector['wz'], color='tab:green', label='wz')
 
+    angular_velocity_magn = np.sqrt(
+        state_vector['wx'] ** 2 + state_vector['wy'] ** 2 + state_vector['wz'] ** 2
+    )
+
+    ax.plot(state_vector.index, angular_velocity_magn, color='tab:red', label='|w|')
+
     fig.tight_layout()
     ax.grid()
 
@@ -324,3 +330,127 @@ def plot_euler_angles(
         bbox_inches='tight',
     )
     plt.close()
+
+
+def plot_torque(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
+    """
+    Plot the torque applied by the magnetorquers over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Torque (N·m)', color='tab:blue')
+    ax.plot(state_vector.index, state_vector['torque_x'], color='tab:blue', label='Torque X')
+    ax.plot(state_vector.index, state_vector['torque_y'], color='tab:orange', label='Torque Y')
+    ax.plot(state_vector.index, state_vector['torque_z'], color='tab:green', label='Torque Z')
+
+    torque_magn = np.sqrt(
+        state_vector['torque_x'] ** 2 + state_vector['torque_y'] ** 2 + state_vector['torque_z'] ** 2
+    )
+
+    ax.plot(state_vector.index, torque_magn, color='tab:red', label='|Torque|')
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Magnetorquer Applied Torque')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'torque.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+
+
+def plot_angular_acceleration(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
+    """
+    Plot the angular acceleration of the satellite over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Angular Acceleration (deg/s²)', color='tab:blue')
+    ax.plot(state_vector.index, state_vector['angular_acceleration_x'], color='tab:blue', label='Alpha X')
+    ax.plot(state_vector.index, state_vector['angular_acceleration_y'], color='tab:orange', label='Alpha Y')
+    ax.plot(state_vector.index, state_vector['angular_acceleration_z'], color='tab:green', label='Alpha Z')
+
+    angular_acceleration_magn = np.sqrt(
+        state_vector['angular_acceleration_x'] ** 2 +
+        state_vector['angular_acceleration_y'] ** 2 +
+        state_vector['angular_acceleration_z'] ** 2
+    )
+
+    ax.plot(state_vector.index, angular_acceleration_magn, color='tab:red', label='|Alpha|')
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Satellite Angular Acceleration')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'angular_acceleration.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+
+
+def plot_pointing_error(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
+    """
+    Plot the pointing error of the satellite over time.
+
+    Args:
+        state_vector (pd.DataFrame): The state vector of the satellite.
+        output_dir (Path): The directory to save the plots.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Pointing Error (degrees)', color='tab:blue')
+    ax.scatter(
+        state_vector.index,
+        state_vector['pointing_error'],
+        color='tab:blue',
+        marker='x',
+        label='Pointing Error'
+    )
+
+    fig.tight_layout()
+    ax.grid()
+
+    ax.set_title('Satellite Pointing Error')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'pointing_error.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+    

@@ -1,7 +1,6 @@
-import ppigrf as igrf
 import numpy as np
-import datetime as dt
 import skyfield.api as skyfield
+import pyIGRF
 from scipy.linalg import eig
 import core.transformations as tr
 import core.utilities as ut
@@ -13,8 +12,8 @@ class MagnetometerImplementation:
     def __init__(
         self,
         noise: bool = False,
-        noise_min: float = 0.02,
-        noise_max: float = 0.02,
+        noise_min: float = 0.006,
+        noise_max: float = 0.006,
     ):
         """
         Initialize the Magnetometer class. It is responsible for calculating the
@@ -33,32 +32,24 @@ class MagnetometerImplementation:
         self.noise_min = noise_min
         self.noise_max = noise_max
 
-    def get_magnetic_field(self, satellite: Satellite, date: dt.datetime) -> np.ndarray:
-        """
-        Get the magnetic field vector at a given satellite position and date.
-        This method uses the ppigrf library to compute the magnetic field
-        vector in the East-North-Up (ENU) reference frame in nT.
+    def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
+        
+        # Get geodetic position from Skyfield
+        lat = satellite.latitude
+        lon = satellite.longitude
+        alt_km = satellite.altitude
 
-        Args:
-            satellite (Satellite): The satellite object containing
-                the TLE data and current status.
-            date (dt.datetime): time object representing the date and time
-                for which the magnetic field vector is to be computed.
+        # Get decimal year for pyIGRF
+        date = julian_date.J
 
-        Returns:
-            np.ndarray: vector containing the magnetic field components
-                in the East-North-Up (ENU) reference frame.
-        """
-
-        be, bn, bu = igrf.igrf(
-            satellite.latitude, satellite.longitude, satellite.altitude, date
-        )
-
-        return np.array([be[0], bn[0], bu[0]])
+        # Bx, By, Bz correspond to North, East, and Down components (NED)
+        _, _, _, Bn, Be, Bd, _ = pyIGRF.igrf_value(lat, lon, alt_km, date)
+        
+        return np.array([Bn, Be, Bd])  # NED frame, nT
 
     def simulate_magnetometer(
         self,
-        satellite: object,
+        satellite: Satellite,
         julian_date: skyfield.Time,
     ) -> np.ndarray:
         """
@@ -68,7 +59,7 @@ class MagnetometerImplementation:
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
         Args:
-            satellite (object): The satellite object containing the TLE data and current
+            satellite (Satellite): The satellite object containing the TLE data and current
                 status.
             julian_date (skyfield.Time): Julian date for which the magnetic field vector
                 is to be computed.
@@ -79,10 +70,10 @@ class MagnetometerImplementation:
                 (nanoTesla). The first three elements are in the SBF frame, and the
                 next three are in the ECI frame.
         """
-        date_time = dt.datetime.fromtimestamp(julian_date.tt)
-        mag_field_enu = self.get_magnetic_field(satellite, date_time)
-        mag_field_ecef = tr.enu_to_ecef(
-            mag_field_enu, satellite.latitude, satellite.longitude
+        mag_field_ned = self.get_magnetic_field(satellite, julian_date)
+        # Convert NED to ENU: ENU = [East, North, Up] = [NED[1], NED[0], -NED[2]]
+        mag_field_ecef = tr.ned_to_ecef(
+            mag_field_ned, satellite.latitude, satellite.longitude
         )
         mag_field_eci = tr.ecef_to_eci(mag_field_ecef, julian_date)
         mag_field_sbf = tr.eci_to_sbf(
@@ -103,8 +94,8 @@ class SunsensorImplementation:
     def __init__(
         self,
         noise: bool = False,
-        noise_min: float = 0.04,
-        noise_max: float = 0.04,
+        noise_min: float = 0.008,
+        noise_max: float = 0.008,
     ):
         """
         Initialize the Sunsensor class. It is responsible for calculating the

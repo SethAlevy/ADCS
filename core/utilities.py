@@ -81,6 +81,13 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
             "sun_vector_eci_x": sun_vector_eci[0],
             "sun_vector_eci_y": sun_vector_eci[1],
             "sun_vector_eci_z": sun_vector_eci[2],
+            "torque_x": satellite.torque[0],
+            "torque_y": satellite.torque[1],
+            "torque_z": satellite.torque[2],
+            "angular_acceleration_x": satellite._angular_acceleration[0],
+            "angular_acceleration_y": satellite._angular_acceleration[1],
+            "angular_acceleration_z": satellite._angular_acceleration[2],
+            "pointing_error": satellite.pointing_error_angle
         },
         index=[0],
     )
@@ -145,6 +152,13 @@ def update_state_vector(
         "sun_vector_eci_x": sun_vector_eci[0],
         "sun_vector_eci_y": sun_vector_eci[1],
         "sun_vector_eci_z": sun_vector_eci[2],
+        "torque_x": satellite.torque[0],
+        "torque_y": satellite.torque[1],
+        "torque_z": satellite.torque[2],
+        "angular_acceleration_x": satellite._angular_acceleration[0],
+        "angular_acceleration_y": satellite._angular_acceleration[1],
+        "angular_acceleration_z": satellite._angular_acceleration[2],
+        "pointing_error": satellite.pointing_error_angle
     }
 
     return state_vector

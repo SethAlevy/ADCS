@@ -20,12 +20,31 @@ def enu_to_ecef(
     Returns:
         np.ndarray: Vector in ECEF frame.
     """
+
     lat = np.deg2rad(lat_deg)
     lon = np.deg2rad(lon_deg)
-    rot_z = R.from_euler("z", lon, degrees=False)
-    rot_y = R.from_euler("y", -(np.pi / 2 - lat), degrees=False)
-    enu_to_ecef_rot = rot_z * rot_y
+
+    rot_x = R.from_euler("x", -(np.pi / 2 - lon), degrees=False)
+    rot_z = R.from_euler("z", -(np.pi / 2 + lat), degrees=False)
+    enu_to_ecef_rot = rot_z * rot_x
     return enu_to_ecef_rot.apply(enu_vec)
+
+
+def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
+    """
+    Convert a vector from NED (North, East, Down) to ECEF using Euler rotations.
+    """
+    lat = np.deg2rad(lat_deg)
+    lon = np.deg2rad(lon_deg)
+    # 1. Rotate by longitude about Z
+    rot_z = R.from_euler('z', -lon, degrees=False)
+    # 2. Rotate by latitude about Y
+    rot_y = R.from_euler('y', lat, degrees=False)
+    # 3. Rotate by 180 deg about X to flip NED to match ECEF
+    rot_x = R.from_euler('x', np.pi, degrees=False)
+    # Compose rotations: rot_x * rot_y * rot_z (applies rot_z, then rot_y, then rot_x)
+    rot = rot_x * rot_y * rot_z
+    return rot.apply(ned_vec)
 
 
 def ecef_to_eci(
@@ -46,8 +65,8 @@ def ecef_to_eci(
     # Get GAST (Greenwich Apparent Sidereal Time) in radians
     gast_rad = time.gast * np.pi / 12  # GAST in hours, convert to radians
 
-    # ECEF to ECI: rotate by GAST about Z axis
-    rot = R.from_euler("z", gast_rad, degrees=False)
+    # ECEF to ECI: rotate forward by GAST about Z axis
+    rot = R.from_euler("z", -gast_rad, degrees=False)
     return rot.apply(ecef_vec)
 
 
@@ -79,8 +98,7 @@ def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
         np.ndarray: Euler angles [x1, y1, z1] in degrees.
     """
     rot = R.from_quat(quat)
-    euler_angles = rot.as_euler("xyz", degrees=degrees)
-    return euler_angles
+    return rot.as_euler("xyz", degrees=degrees)
 
 
 def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
@@ -98,6 +116,26 @@ def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     """
     rot = R.from_quat(quat_sb_from_eci)
     return rot.apply(vec_eci)
+
+
+def sbf_to_eci(vec_sbf: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
+    """
+    Transform a vector from the SBF (Satellite Body Frame) to the ECI
+    (Earth-Centered Inertial) frame using a quaternion.
+    The rotation from SBF to ECI is the inverse of the rotation from ECI to SBF.
+
+    Args:
+        vec_sbf (np.ndarray): Vector in SBF frame.
+        quat_sb_from_eci (np.ndarray): Quaternion representing rotation from ECI to
+            satellite body frame, in [x, y, z, w] format.
+
+    Returns:
+        np.ndarray: Vector in ECI frame.
+    """
+    # The inverse of a rotation is its conjugate.
+    rot = R.from_quat(quat_sb_from_eci)
+    inv_rot = rot.inv()
+    return inv_rot.apply(vec_sbf)
 
 
 def quat_deriv(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
@@ -188,3 +226,26 @@ def rotate_vector_by_quaternion(
     """
     rot = R.from_quat(quaternion)
     return rot.apply(vector)
+
+
+def to_earth_rotation(
+        position: np.ndarray, 
+        align_axis: np.ndarray | list,
+        quaternion: np.ndarray
+) -> np.ndarray:
+    """
+    Compute the quaternion that rotates the given vector to point towards Earth.
+
+    Args:
+        position (np.ndarray): Position vector in ECI frame.
+        align_axis (np.ndarray | list): Axis that will be rotated towards Earth.
+        quaternion (np.ndarray): Quaternion representing the current orientation.
+
+    Returns:
+        np.ndarray: Quaternion representing the rotation.
+    """
+    position_norm = position / np.linalg.norm(position)
+    to_earth_vector = position_norm * -1
+    align_axis_eci = sbf_to_eci(align_axis, quaternion)
+    rotation = R.align_vectors(align_axis_eci, to_earth_vector)[0]
+    return rotation.as_quat()

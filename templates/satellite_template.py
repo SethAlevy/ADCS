@@ -199,6 +199,40 @@ class Satellite(ABC):
         """
         pass
 
+    @property
+    def pointing_error_angle(self) -> np.ndarray:
+        """
+        Get the pointing error angle in degrees. This is the angle between the 
+        vector that the satellite is aligned to and the Earth vector in ECI frame.
+        Initialized as 0.0 and updated after pointing was launched.
+
+        Returns:
+            np.ndarray: Pointing error angle in degrees.
+        """
+        pass
+    
+    @property
+    def torque(self) -> np.ndarray:
+        """
+        Get the torque applied by the magnetorquers in Nm. Initialized as
+        [0.0, 0.0, 0.0] and updated after detumbling or pointing was launched.
+
+        Returns:
+            np.ndarray: Torque applied by the magnetorquers in Nm.
+        """
+        pass
+        
+    @property
+    def angular_acceleration(self) -> np.ndarray:
+        """
+        Get the angular acceleration of the satellite in rad/s^2. Initialized as
+        [0.0, 0.0, 0.0] and updated after detumbling or pointing was launched.
+
+        Returns:
+            np.ndarray: Angular acceleration of the satellite in rad/s^2.
+        """
+        pass
+
     @abstractmethod
     def apply_rotation(self) -> None:
         """

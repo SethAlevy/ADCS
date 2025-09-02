@@ -23,7 +23,9 @@ class SatelliteImplementation(Satellite):
         magnetometer: Magnetometer = None,
         sunsensor: Sunsensor = None,
         sensor_fusion: SensorFusion = None,
-        round_filter: bool = False
+        round_filter: bool = False,
+        detumbling_threshold: float = 2.0,
+        measurements_interval: int = 5,
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -49,7 +51,11 @@ class SatelliteImplementation(Satellite):
                 performing sensor fusion algorithms such as TRIAD, QUEST, or EKF.
             round_filter (bool): If True, applies a rounding filter to the
                 satellite's parameters to reduce numerical noise. Defaults to True.
+            detumbling_threshold (float): The angular velocity magnitude above which
+                detumbling is applied. Defaults to 3.0 degrees/s.
         """
+
+        # TODO add measurement and actuation periods
         self.setup = setup
         self._angular_velocity = self.setup.angular_velocity
         self._euler_angles = self.setup.euler_angles
@@ -72,9 +78,17 @@ class SatelliteImplementation(Satellite):
             self.magnetometer = magnetometer
         if sunsensor is not None:
             self.sunsensor = sunsensor
+        self.activation_interval = measurements_interval
 
         self.sensor_fusion = sensor_fusion
         self.magnetorquer = MagnetorquerImplemetation(self.setup, self)
+
+        self.detumbling_threshold = detumbling_threshold
+        self.start_detumbling = True
+        self.start_pointing = False
+
+        self._torque = np.zeros(3)
+        self._angular_acceleration = np.zeros(3)
 
     def update_iteration(self, iteration: int) -> None:
         """
@@ -277,11 +291,17 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
             [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
+        # if self.iteration % self.activation_interval == 0 or self.iteration == 1:
         julian_date = ut.time_julian_date(self)
         mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(self, julian_date)
         if self.round_filter:
             mag_sbf = ut.filter_significant_digits(mag_sbf, 4)
             mag_eci = ut.filter_significant_digits(mag_eci, 4)
+        self.magnetometer.last_sbf_measurement = mag_sbf
+        self.magnetometer.last_eci_measurement = mag_eci
+        # else:
+        #     mag_sbf = self.magnetometer.last_sbf_measurement
+        #     mag_eci = self.magnetometer.last_eci_measurement
         return mag_sbf, mag_eci
 
     @property
@@ -294,12 +314,58 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Sun vector in the SBF and ECI frames in form of
             [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
+        # if self.iteration % self.activation_interval == 0 or self.iteration == 1:
         julian_date = ut.time_julian_date(self)
         sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
         if self.round_filter:
             sun_sbf = ut.filter_significant_digits(sun_sbf, 5)
             sun_eci = ut.filter_significant_digits(sun_eci, 5)
+        self.sunsensor.last_sbf_measurement = sun_sbf
+        self.sunsensor.last_eci_measurement = sun_eci
+        # else:
+        #     sun_sbf = self.sunsensor.last_sbf_measurement
+        #     sun_eci = self.sunsensor.last_eci_measurement
         return sun_sbf, sun_eci
+    
+    @property
+    def pointing_error_angle(self) -> np.ndarray:
+        """
+        Get the pointing error angle in degrees. This is the angle between the 
+        vector that the satellite is aligned to and the Earth vector in ECI frame.
+        Initialized as 0.0 and updated after pointing was launched.
+
+        Returns:
+            np.ndarray: Pointing error angle in degrees.
+        """
+        return self.magnetorquer.pointing_error_angle
+    
+    @property
+    def torque(self) -> np.ndarray:
+        """
+        Get the torque applied by the magnetorquers in Nm. Initialized as
+        [0.0, 0.0, 0.0] and updated after detumbling or pointing was launched.
+
+        Returns:
+            np.ndarray: Torque applied by the magnetorquers in Nm.
+        """
+        if self.start_detumbling or self.start_pointing:
+            return self._torque
+        else:
+            return np.zeros(3)
+        
+    @property
+    def angular_acceleration(self) -> np.ndarray:
+        """
+        Get the angular acceleration of the satellite in rad/s^2. Initialized as
+        [0.0, 0.0, 0.0] and updated after detumbling or pointing was launched.
+
+        Returns:
+            np.ndarray: Angular acceleration of the satellite in rad/s^2.
+        """
+        if self.start_detumbling or self.start_pointing:
+            return self._angular_acceleration
+        else:
+            return np.zeros(3)
 
     def apply_rotation(self) -> None:
         """
@@ -382,17 +448,80 @@ class SatelliteImplementation(Satellite):
     def apply_detumbling(
             self,
             method: str,
+            adapt_magnetic: bool = False,
+            adapt_velocity: bool = False,
+            proportional: bool = False,
+            modified: bool = False
     ) -> np.ndarray:
         """
         Perform detumbling using the specified method.
         """
         if method == "b_dot":
-            angular_acceleration = self.magnetorquer.b_dot(self.magnetic_field[0], 1)
+            if self.start_detumbling:
+                angular_acceleration = self.magnetorquer.b_dot(
+                    self.magnetic_field[0],
+                    1,
+                    adapt_magnetic,
+                    adapt_velocity,
+                    proportional,
+                    modified
+                )
+                self._angular_velocity = self.angular_velocity - ut.rad_to_degrees(
+                    angular_acceleration
+                )
+
+                self._torque = self.magnetorquer.torque
+                self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
         else:
             raise ValueError(f"Unknown detumbling method: {method}")
-        self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
-            angular_acceleration
-        )
-        if self.iteration % 100 == 0:
-            print(f"Angular acceleration applied: {np.linalg.norm(ut.rad_to_degrees(angular_acceleration))}")
-            print(f"New angular velocity: {np.linalg.norm(self.angular_velocity)}")
+
+    def apply_pointing(
+        self,
+        method: str,
+        task: str,
+        align_axis: np.ndarray | list,
+    ):
+        """
+        Apply pointing control to the satellite. This method uses the B-cross
+        algorithm to calculate the required torque to align the satellite's
+        body frame with a target vector in the inertial frame.
+
+        Args:
+            method (str): The method to use for pointing control. Currently,
+                only 'b_cross' is supported.
+            task (str): The task which the B-cross should perform. As the algorithm is
+                dedicated to pointing, currently 'earth-pointing' and 'sun-pointing'
+                are supported.
+            align_axis (np.ndarray | list): The axis which should be rotated towards
+                the given target.
+        
+        """
+        self.detumbling_pointing_switch()
+        if method == "b_cross" and self.start_pointing:
+            angular_acceleration = self.magnetorquer.b_cross(
+                self.magnetic_field[1],
+                self.magnetic_field[0],
+                task,
+                align_axis
+            )
+        
+            self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
+                angular_acceleration
+            )
+
+            self._torque = self.magnetorquer.torque
+            self._angular_acceleration = angular_acceleration
+
+    def detumbling_pointing_switch(self) -> None:
+        """
+        Validate the angular velocity to determine if detumbling should stop or start
+        again. Initially set to True.
+        """
+        if self.start_detumbling and np.linalg.norm(self.angular_velocity) <= self.detumbling_threshold:
+            self.start_detumbling = False
+            self.start_pointing = True
+            print(f"Detumbling stopped, angular velocity is below threshold {self.detumbling_threshold}.")
+        elif not self.start_detumbling and np.linalg.norm(self.angular_velocity) >= self.detumbling_threshold * 1.5:
+            self.start_detumbling = True
+            self.start_pointing = False
+            print(f"Detumbling started, angular velocity increased above threshold {self.detumbling_threshold * 1.5}.")
