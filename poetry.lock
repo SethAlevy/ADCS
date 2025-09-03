@@ -376,6 +376,26 @@ unicode = ["unicodedata2 (>=15.1.0) ; python_version <= \"3.12\""]
 woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "brotlicffi (>=0.8.0) ; platform_python_implementation != \"CPython\"", "zopfli (>=0.1.4)"]
 
 [[package]]
+name = "igrf"
+version = "13.0.2"
+description = "IGRF13, IGRF12, IGRF11 models with simple object-oriented Python interface."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "igrf-13.0.2.tar.gz", hash = "sha256:867caa2c8dffe87b42f6187afb97a92e60c08c4e49ac5a57a46112e3121ca1a9"},
+]
+
+[package.dependencies]
+numpy = "*"
+xarray = "*"
+
+[package.extras]
+lint = ["flake8", "flake8-blind-except", "flake8-bugbear", "flake8-builtins", "mypy", "types-python-dateutil"]
+plot = ["matplotlib"]
+tests = ["pytest"]
+
+[[package]]
 name = "ipykernel"
 version = "6.29.5"
 description = "IPython Kernel for Jupyter"
@@ -1191,6 +1211,21 @@ files = [
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pyigrf"
+version = "1.0.0"
+description = "IGRF-14 Model by Python"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pyigrf-1.0.0-py3-none-any.whl", hash = "sha256:733487d5750c8c2f8558c23d4bdebfb1e9c837e5aef437fc4425042c9dbb2d0b"},
+    {file = "pyigrf-1.0.0.tar.gz", hash = "sha256:d117a33a8ee5a31aeae415fe9a6777a6586e7ee54184fc74d84df20bb75ebd81"},
+]
+
+[package.dependencies]
+NumPy = "*"
+
+[[package]]
 name = "pyparsing"
 version = "3.2.3"
 description = "pyparsing module - Classes and methods to define and execute parsing grammars"
@@ -1617,7 +1652,33 @@ files = [
     {file = "widgetsnbextension-4.0.14.tar.gz", hash = "sha256:a3629b04e3edb893212df862038c7232f62973373869db5084aed739b437b5af"},
 ]
 
+[[package]]
+name = "xarray"
+version = "2025.7.1"
+description = "N-D labeled arrays and datasets in Python"
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "xarray-2025.7.1-py3-none-any.whl", hash = "sha256:e8647b659e53bd350d7c5a91c34dd4122ad6a3ca0bc41399d424a7c0273c7635"},
+    {file = "xarray-2025.7.1.tar.gz", hash = "sha256:2884bf5672b540fcc6ff8c20a3196bda0d78fbfb4d67398d60526e97c2faceef"},
+]
+
+[package.dependencies]
+numpy = ">=1.26"
+packaging = ">=24.1"
+pandas = ">=2.2"
+
+[package.extras]
+accel = ["bottleneck", "flox (>=0.9)", "numba (>=0.59)", "numbagg (>=0.8)", "opt_einsum", "scipy (>=1.13)"]
+complete = ["xarray[accel,etc,io,parallel,viz]"]
+etc = ["sparse (>=0.15)"]
+io = ["cftime", "fsspec", "h5netcdf", "netCDF4 (>=1.6.0)", "pooch", "pydap", "scipy (>=1.13)", "zarr (>=2.18)"]
+parallel = ["dask[complete]"]
+types = ["pandas-stubs", "scipy-stubs", "types-PyYAML", "types-Pygments", "types-colorama", "types-decorator", "types-defusedxml", "types-docutils", "types-networkx", "types-openpyxl", "types-pexpect", "types-psutil", "types-pycurl", "types-python-dateutil", "types-pytz", "types-setuptools"]
+viz = ["cartopy (>=0.23)", "matplotlib", "nc-time-axis", "seaborn"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "c9edc674fe4f0d0c838bdfecb3e7b10c0f2f7a9fe4786e2e05245fce5878ff6b"
+content-hash = "2b1a3eee104f555f259ab90863f358c0bbfb72cf514f46781b6a8bf842992e96"

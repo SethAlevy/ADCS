@@ -16,9 +16,9 @@ class MagnetorquerImplemetation:
             setup: SimulationSetup, 
             satellite: Satellite,
             safety_factor: float = 0.95,
-            k: float = 8000,
+            k: float = 10000,
             angular_velocity_ref: float = 4,  # deg/s
-            alpha: float = 1.8,
+            alpha: float = 1.6,
             magnetic_field_ref: float = 45000,  # nT
             beta: float = 0.5,
             k_p: float = 0.3,
@@ -125,9 +125,11 @@ class MagnetorquerImplemetation:
         else:
             k = -self.k
 
-        # print(f"Gain: {k}")
+        print(f"Gain: {k}")
         magnetic_field = magnetic_field * 1e-9  # nT to T
         # print(f"Reference angular velocity (rad/s): {self.angular_velocity_ref}")
+        print(f"Angular velocity deg/s: {self._satellite.angular_velocity}")
+        print(f"Magnetic field (T): {magnetic_field}")
 
         db_dt = self.filtered_derivative(
             magnetic_field, 
@@ -145,6 +147,15 @@ class MagnetorquerImplemetation:
             mag_dipol_mom_required = k * np.cross(angular_velocity, magnetic_field)
         else:
             mag_dipol_mom_required = k * db_dt
+            angular_velocity = ut.degrees_to_rad(self._satellite.angular_velocity)
+            mag_dipol_mom_required_2 = k * np.cross(angular_velocity, magnetic_field)
+
+        print(f"Filetered derivative {db_dt}")
+        print(f"Modified item {np.cross(angular_velocity, magnetic_field)}")
+
+        print(f"Magnetic dipole moment b-dot: {mag_dipol_mom_required}")
+        print(f"Magnetic dipole moment b-dot modified: {mag_dipol_mom_required_2}")
+
         current_per_axis = self.apply_torquer_saturation(mag_dipol_mom_required)
         # Calculate actual dipole moment after saturation
         mag_dipol_mom_real = current_per_axis * self.no_of_coils * self.coil_area

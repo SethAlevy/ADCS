@@ -12,8 +12,7 @@ class MagnetometerImplementation:
     def __init__(
         self,
         noise: bool = False,
-        noise_min: float = 0.006,
-        noise_max: float = 0.006,
+        noise_max: float = 10,
     ):
         """
         Initialize the Magnetometer class. It is responsible for calculating the
@@ -25,11 +24,10 @@ class MagnetometerImplementation:
         Args:
             noise (bool, optional): If True, adds noise to the magnetic field vector.
                 Defaults to False.
-            noise_min (float, optional): Minimum noise to apply. Defaults to 0.02.
-            noise_max (float, optional): Maximum noise to apply. Defaults to 0.02.
+            noise_max (float, optional): Maximum noise level to apply in nT. 
+                Defaults to 10.
         """
         self.noise = noise
-        self.noise_min = noise_min
         self.noise_max = noise_max
 
     def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
@@ -78,14 +76,14 @@ class MagnetometerImplementation:
         mag_field_eci = tr.ecef_to_eci(mag_field_ecef, julian_date)
         mag_field_sbf = tr.eci_to_sbf(
             mag_field_eci,
-            tr.euler_xyz_to_quaternion(satellite.euler_angles),
+            satellite.quaternion
         )
 
         if self.noise:
             noise_vector = np.random.uniform(
-                1 - self.noise_min, 1 + self.noise_max, 3
+                -self.noise_max, self.noise_max, 3
             )
-            mag_field_sbf *= noise_vector
+            mag_field_sbf += noise_vector
 
         return mag_field_sbf, mag_field_eci
 
@@ -94,8 +92,7 @@ class SunsensorImplementation:
     def __init__(
         self,
         noise: bool = False,
-        noise_min: float = 0.008,
-        noise_max: float = 0.008,
+        angular_noise_max: float = 0.05,
     ):
         """
         Initialize the Sunsensor class. It is responsible for calculating the
@@ -107,12 +104,11 @@ class SunsensorImplementation:
         Args:
             noise (bool, optional): If True, adds noise to the Sun vector.
                 Defaults to False.
-            noise_min (float, optional): Minimum noise to apply. Defaults to 0.04.
-            noise_max (float, optional): Maximum noise to apply. Defaults to 0.04.
+            angular_noise_max (float, optional): Maximum angular noise to apply in 
+                degrees. Defaults to 0.05.
         """
         self.noise = noise
-        self.noise_min = noise_min
-        self.noise_max = noise_max
+        self.angular_noise_max = angular_noise_max
 
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
         """
@@ -155,11 +151,14 @@ class SunsensorImplementation:
         sun_eci = self.sun_vector_eci(julian_date)
         sun_sbf = tr.eci_to_sbf(sun_eci, satellite.quaternion)
 
+        sun_eci = sun_eci / np.linalg.norm(sun_eci)
+        sun_sbf = sun_sbf / np.linalg.norm(sun_sbf)
+
         if self.noise:
-            noise_vector = np.random.uniform(
-                1 - self.noise_min, 1 + self.noise_max, 3
+            angular_noise = np.random.uniform(
+                -self.angular_noise_max, self.angular_noise_max, 1
             )
-            sun_sbf *= noise_vector
+            sun_sbf = tr.vector_angular_noise(sun_sbf, angular_noise[0])
 
         return sun_sbf, sun_eci
 

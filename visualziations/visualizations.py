@@ -454,3 +454,92 @@ def plot_pointing_error(
     )
     plt.close()
     
+
+def plot_sun_vector_eci(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
+    """
+    Plot the sun vector in ECI frame over time.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Sun Vector (ECI)', color='tab:blue')
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_eci_x'],
+        color='tab:blue',
+        label='ECI X'
+    )
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_eci_y'],
+        color='tab:orange',
+        label='ECI Y'
+    )
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_eci_z'],
+        color='tab:green',
+        label='ECI Z'
+    )
+
+    fig.tight_layout()
+    ax.grid()
+    ax.set_title('Satellite Sun Vector in ECI')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'sun_vector_eci.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
+
+
+def plot_sun_vector_sbf(
+    state_vector: pd.DataFrame,
+    output_dir: Path = Path(__file__).resolve().parent
+) -> None:
+    """
+    Plot the sun vector in SBF frame over time.
+    """
+    output_dir.joinpath('plots').mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Sun Vector (SBF)', color='tab:blue')
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_sbf_x'],
+        color='tab:blue',
+        label='SBF X'
+    )
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_sbf_y'],
+        color='tab:orange',
+        label='SBF Y'
+    )
+    ax.plot(
+        state_vector.index,
+        state_vector['sun_vector_sbf_z'],
+        color='tab:green',
+        label='SBF Z'
+    )
+
+    fig.tight_layout()
+    ax.grid()
+    ax.set_title('Satellite Sun Vector in SBF')
+    ax.legend(loc=0)
+
+    plt.savefig(
+        output_dir.joinpath('plots', 'sun_vector_sbf.png'),
+        dpi=300,
+        bbox_inches='tight',
+    )
+    plt.close()
