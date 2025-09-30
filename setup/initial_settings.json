@@ -10,8 +10,8 @@
 
     "SatelliteParams" : [
         {
-            "mass" : 2,
-            "I" : [[0.01, 0, 0], [0, 0.01, 0], [0, 0, 0.02]],
+            "mass" : 1.5,
+            "I" : [[0.011, 0, 0], [0, 0.011, 0], [0, 0, 0.011]],
             "unitInfo" : "kg, kg*m^2"
         }
 
@@ -20,7 +20,7 @@
     "InitialState" : [
         {
             "eulerAngles" : [0.0, 0.0, 0.0],
-            "angularVelocity" : [0.0, 0.0, 5.0],
+            "angularVelocity" : [0, 0, 0],
             "unitInfo" : "deg, deg/s"
         }
     ],
@@ -38,7 +38,7 @@
         {
             "n" : 100,
             "A" : 2,
-            "maxI": 0.6,
+            "maxI": 0.5,
             "unitInfo" : "coils, cm^2, A"
         }
     ],

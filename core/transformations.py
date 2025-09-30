@@ -11,40 +11,29 @@ def enu_to_ecef(
 ) -> np.ndarray:
     """
     Convert a vector from ENU (East-North-Up) to ECEF (Earth-Centered, Earth-Fixed).
-
-    Args:
-        enu_vec (np.ndarray): Vector in ENU frame.
-        lat_deg (float): Latitude in degrees.
-        lon_deg (float): Longitude in degrees.
-
-    Returns:
-        np.ndarray: Vector in ECEF frame.
     """
-
     lat = np.deg2rad(lat_deg)
     lon = np.deg2rad(lon_deg)
 
-    rot_x = R.from_euler("x", -(np.pi / 2 - lon), degrees=False)
-    rot_z = R.from_euler("z", -(np.pi / 2 + lat), degrees=False)
-    enu_to_ecef_rot = rot_z * rot_x
-    return enu_to_ecef_rot.apply(enu_vec)
+    sφ, cφ = np.sin(lat), np.cos(lat)
+    sλ, cλ = np.sin(lon), np.cos(lon)
+
+    # Standard ENU→ECEF rotation (columns are E,N,U expressed in ECEF)
+    rot_enu_to_ecef = R.from_matrix(np.array([
+        [-sλ,         cλ,        0.0],
+        [-sφ * cλ,   -sφ * sλ,   cφ ],
+        [ cφ * cλ,    cφ * sλ,   sφ ],
+    ]))
+    return rot_enu_to_ecef.apply(enu_vec)
 
 
 def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
     """
-    Convert a vector from NED (North, East, Down) to ECEF using Euler rotations.
+    Convert a vector from NED (North, East, Down) to ECEF using ENU as an intermediate.
     """
-    lat = np.deg2rad(lat_deg)
-    lon = np.deg2rad(lon_deg)
-    # 1. Rotate by longitude about Z
-    rot_z = R.from_euler('z', -lon, degrees=False)
-    # 2. Rotate by latitude about Y
-    rot_y = R.from_euler('y', lat, degrees=False)
-    # 3. Rotate by 180 deg about X to flip NED to match ECEF
-    rot_x = R.from_euler('x', np.pi, degrees=False)
-    # Compose rotations: rot_x * rot_y * rot_z (applies rot_z, then rot_y, then rot_x)
-    rot = rot_x * rot_y * rot_z
-    return rot.apply(ned_vec)
+    # NED → ENU: [N, E, D] → [E, N, U] = [E=NED[1], N=NED[0], U=-NED[2]]
+    enu = np.array([ned_vec[1], ned_vec[0], -ned_vec[2]], dtype=float)
+    return enu_to_ecef(enu, lat_deg, lon_deg)
 
 
 def ecef_to_eci(
@@ -66,7 +55,7 @@ def ecef_to_eci(
     gast_rad = time.gast * np.pi / 12  # GAST in hours, convert to radians
 
     # ECEF to ECI: rotate forward by GAST about Z axis
-    rot = R.from_euler("z", -gast_rad, degrees=False)
+    rot = R.from_euler("z", gast_rad, degrees=False)
     return rot.apply(ecef_vec)
 
 
@@ -234,18 +223,69 @@ def to_earth_rotation(
         quaternion: np.ndarray
 ) -> np.ndarray:
     """
-    Compute the quaternion that rotates the given vector to point towards Earth.
+    Compute the quaternion that rotates align_axis (SBF) to point toward Earth in ECI.
 
     Args:
-        position (np.ndarray): Position vector in ECI frame.
-        align_axis (np.ndarray | list): Axis that will be rotated towards Earth.
-        quaternion (np.ndarray): Quaternion representing the current orientation.
+        position (np.ndarray): Satellite position in ECI frame.
+        align_axis (np.ndarray | list): Axis in SBF to be aligned toward Earth (e.g., [0, 0, 1] for +Z).
+        quaternion (np.ndarray): Current quaternion from ECI to SBF.
+    """
+    position = np.asarray(position, dtype=float)
+    align_axis = np.asarray(align_axis, dtype=float)
+
+    # Target direction in ECI: toward Earth's center
+    r_norm = np.linalg.norm(position)
+    if r_norm == 0.0:
+        return np.array([0.0, 0.0, 0.0, 1.0])
+    to_earth_vector = -position / r_norm  # -r̂
+
+    # Current body axis expressed in ECI
+    align_axis_eci = sbf_to_eci(align_axis, quaternion)
+    a = align_axis_eci / (np.linalg.norm(align_axis_eci) + 1e-20)
+    b = to_earth_vector  # already unit
+
+    # Minimal quaternion rotating a -> b (handles antiparallel)
+    c = float(np.clip(np.dot(a, b), -1.0, 1.0))
+    if c > 0.999999:
+        rotation_quaternion = np.array([0.0, 0.0, 0.0, 1.0])
+    elif c < -0.999999:
+        axis = np.cross(a, np.array([1.0, 0.0, 0.0]))
+        if np.linalg.norm(axis) < 1e-8:
+            axis = np.cross(a, np.array([0.0, 1.0, 0.0]))
+        axis = axis / (np.linalg.norm(axis) + 1e-20)
+        rotation_quaternion = R.from_rotvec(np.pi * axis).as_quat()
+    else:
+        axis = np.cross(a, b)
+        s = np.sqrt((1.0 + c) * 2.0)
+        rotation_quaternion = np.array([axis[0] / s, axis[1] / s, axis[2] / s, 0.5 * s])
+
+    return rotation_quaternion
+
+
+def vector_angular_noise(vec: np.ndarray, angle_deg: float) -> np.ndarray:
+    """
+    Rotate the unit vector by a random axis with angular noise.
+
+    Args:
+        vec (np.ndarray): The input unit vector to be rotated.
+        angle_deg (float): The angular noise in degrees.
 
     Returns:
-        np.ndarray: Quaternion representing the rotation.
+        np.ndarray: The rotated vector.
     """
-    position_norm = position / np.linalg.norm(position)
-    to_earth_vector = position_norm * -1
-    align_axis_eci = sbf_to_eci(align_axis, quaternion)
-    rotation = R.align_vectors(align_axis_eci, to_earth_vector)[0]
-    return rotation.as_quat()
+    angle_rad = np.deg2rad(angle_deg)
+    # Generate a random axis perpendicular to vec
+    rand_vec = np.random.randn(3)
+    rand_vec = rand_vec / np.linalg.norm(rand_vec)
+    axis = np.cross(vec, rand_vec)
+
+    axis_norm = np.linalg.norm(axis)
+    if axis_norm < 1e-6:
+        # If random vector is parallel, pick a fixed perpendicular axis
+        axis = np.cross(vec, [1, 0, 0])
+        axis_norm = np.linalg.norm(axis)
+    axis = axis / axis_norm
+    # Create rotation
+    rot = R.from_rotvec(axis * angle_rad)
+    q = rot.as_quat()
+    return rot.apply(vec)

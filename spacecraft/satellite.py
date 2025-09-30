@@ -1,7 +1,7 @@
 from templates.satellite_template import Satellite
 import numpy as np
 from setup.two_line_element import TwoLineElement
-from spacecraft.actuator import MagnetorquerImplemetation
+from spacecraft.actuator import MagnetorquerImplementation
 from templates.initial_settings_template import SimulationSetup
 from templates.sensors_template import Magnetometer
 from templates.sensors_template import Sunsensor
@@ -24,7 +24,7 @@ class SatelliteImplementation(Satellite):
         sunsensor: Sunsensor = None,
         sensor_fusion: SensorFusion = None,
         round_filter: bool = False,
-        detumbling_threshold: float = 2.0,
+        detumbling_threshold: float = 1,
         measurements_interval: int = 5,
     ):
         """
@@ -81,7 +81,7 @@ class SatelliteImplementation(Satellite):
         self.activation_interval = measurements_interval
 
         self.sensor_fusion = sensor_fusion
-        self.magnetorquer = MagnetorquerImplemetation(self.setup, self)
+        self.magnetorquer = MagnetorquerImplementation(self.setup, self)
 
         self.detumbling_threshold = detumbling_threshold
         self.start_detumbling = True
@@ -326,7 +326,7 @@ class SatelliteImplementation(Satellite):
         #     sun_sbf = self.sunsensor.last_sbf_measurement
         #     sun_eci = self.sunsensor.last_eci_measurement
         return sun_sbf, sun_eci
-    
+
     @property
     def pointing_error_angle(self) -> np.ndarray:
         """
@@ -338,7 +338,7 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Pointing error angle in degrees.
         """
         return self.magnetorquer.pointing_error_angle
-    
+
     @property
     def torque(self) -> np.ndarray:
         """
@@ -352,7 +352,7 @@ class SatelliteImplementation(Satellite):
             return self._torque
         else:
             return np.zeros(3)
-        
+
     @property
     def angular_acceleration(self) -> np.ndarray:
         """
@@ -423,6 +423,8 @@ class SatelliteImplementation(Satellite):
             self,
             v_b_list: list[np.ndarray],
             v_i_list: list[np.ndarray],
+            quaternion_prev: np.ndarray,
+            timestemp: float = 1.0
     ) -> None:
         """
         Apply the Extended Kalman Filter (EKF) for attitude estimation of at
@@ -441,8 +443,8 @@ class SatelliteImplementation(Satellite):
             v_b_list,
             v_i_list,
             angular_velocity_rad,
-            1,
-            self.quaternion
+            timestemp,
+            quaternion_prev
         )
 
     def apply_detumbling(
@@ -494,9 +496,8 @@ class SatelliteImplementation(Satellite):
                 are supported.
             align_axis (np.ndarray | list): The axis which should be rotated towards
                 the given target.
-        
+
         """
-        self.detumbling_pointing_switch()
         if method == "b_cross" and self.start_pointing:
             angular_acceleration = self.magnetorquer.b_cross(
                 self.magnetic_field[1],
@@ -504,13 +505,10 @@ class SatelliteImplementation(Satellite):
                 task,
                 align_axis
             )
-        
-            self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
-                angular_acceleration
-            )
+            self._angular_velocity = self.angular_velocity - ut.rad_to_degrees(angular_acceleration)
 
             self._torque = self.magnetorquer.torque
-            self._angular_acceleration = angular_acceleration
+            self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
 
     def detumbling_pointing_switch(self) -> None:
         """
@@ -520,8 +518,10 @@ class SatelliteImplementation(Satellite):
         if self.start_detumbling and np.linalg.norm(self.angular_velocity) <= self.detumbling_threshold:
             self.start_detumbling = False
             self.start_pointing = True
-            print(f"Detumbling stopped, angular velocity is below threshold {self.detumbling_threshold}.")
-        elif not self.start_detumbling and np.linalg.norm(self.angular_velocity) >= self.detumbling_threshold * 1.5:
+            print(
+                f"Detumbling stopped, angular velocity is below threshold {self.detumbling_threshold}.")
+        elif not self.start_detumbling and np.linalg.norm(self.angular_velocity) >= self.detumbling_threshold * 2:
             self.start_detumbling = True
             self.start_pointing = False
-            print(f"Detumbling started, angular velocity increased above threshold {self.detumbling_threshold * 1.5}.")
+            print(
+                f"Detumbling started, angular velocity increased above threshold {self.detumbling_threshold * 2}.")

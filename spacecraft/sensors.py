@@ -1,7 +1,8 @@
 import numpy as np
-import skyfield.api as skyfield
+import datetime
 import pyIGRF
-from scipy.linalg import eig
+import skyfield.api as skyfield
+from scipy.linalg import eigh
 import core.transformations as tr
 import core.utilities as ut
 from templates.satellite_template import Satellite
@@ -12,7 +13,7 @@ class MagnetometerImplementation:
     def __init__(
         self,
         noise: bool = False,
-        noise_max: float = 10,
+        noise_max: float = 10.0,
     ):
         """
         Initialize the Magnetometer class. It is responsible for calculating the
@@ -25,25 +26,42 @@ class MagnetometerImplementation:
             noise (bool, optional): If True, adds noise to the magnetic field vector.
                 Defaults to False.
             noise_max (float, optional): Maximum noise level to apply in nT. 
-                Defaults to 10.
+                Defaults to 10.0.
         """
         self.noise = noise
         self.noise_max = noise_max
 
     def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
-        
-        # Get geodetic position from Skyfield
+        """
+        Get the magnetic field vector at the satellite's position and given time. 
+        Magnetic field model is taken from the IGRF via pyIGRF library. Originally it is
+        in NED (North-East-Down) frame and in nT (nanoTesla) thus a transformation is
+        needed to convert it to ECEF and then to ECI frame.
+
+        Args:
+            satellite (Satellite): The satellite object containing the TLE data and
+                current status.
+            julian_date (skyfield.Time): Julian date for which the magnetic field vector
+                is to be computed.
+    
+        Returns:
+            np.ndarray: Magnetic field vector in NED frame in nT (nanoTesla).
+        """
+
+        # Satellite geodetic (deg, km)
         lat = satellite.latitude
         lon = satellite.longitude
         alt_km = satellite.altitude
 
-        # Get decimal year for pyIGRF
-        date = julian_date.J
+        # Skyfield Time -> decimal year for IGRF
+        dt = julian_date.utc_datetime()
+        start = datetime.datetime(dt.year, 1, 1, tzinfo=dt.tzinfo)
+        end = datetime.datetime(dt.year + 1, 1, 1, tzinfo=dt.tzinfo)
+        dec_year = dt.year + (dt - start).total_seconds() / (end - start).total_seconds()
 
-        # Bx, By, Bz correspond to North, East, and Down components (NED)
-        _, _, _, Bn, Be, Bd, _ = pyIGRF.igrf_value(lat, lon, alt_km, date)
-        
-        return np.array([Bn, Be, Bd])  # NED frame, nT
+        # IGRF returns NED components in nT
+        _, _, _, Bn, Be, Bd, _ = pyIGRF.igrf_value(lat, lon, alt_km, dec_year)
+        return np.array([Bn, Be, Bd])  # NED, nT
 
     def simulate_magnetometer(
         self,
@@ -52,7 +70,7 @@ class MagnetometerImplementation:
     ) -> np.ndarray:
         """
         Simulate the magnetometer readings. This method computes the
-        magnetic field vector at a given satellite and date, optionally adds
+        magnetic field vector at a given position and date, optionally adds
         noise and transforms it to the Satellite Body Frame (SBF) and Earth
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
@@ -81,7 +99,7 @@ class MagnetometerImplementation:
 
         if self.noise:
             noise_vector = np.random.uniform(
-                -self.noise_max, self.noise_max, 3
+                -self.noise_max / 2, self.noise_max / 2, 3
             )
             mag_field_sbf += noise_vector
 
@@ -92,7 +110,7 @@ class SunsensorImplementation:
     def __init__(
         self,
         noise: bool = False,
-        angular_noise_max: float = 0.05,
+        angular_noise_max: float = 0.2,
     ):
         """
         Initialize the Sunsensor class. It is responsible for calculating the
@@ -104,11 +122,15 @@ class SunsensorImplementation:
         Args:
             noise (bool, optional): If True, adds noise to the Sun vector.
                 Defaults to False.
-            angular_noise_max (float, optional): Maximum angular noise to apply in 
-                degrees. Defaults to 0.05.
+            angular_noise_max (float, optional): Maximum angular noise to apply in
+                degrees. Defaults to 0.2.
         """
         self.noise = noise
         self.angular_noise_max = angular_noise_max
+
+        eph = skyfield.load('de421.bsp')  # or 'de440s.bsp' if you want higher precision
+        self.sun = eph['sun']
+        self.earth = eph['earth']
 
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
         """
@@ -121,12 +143,10 @@ class SunsensorImplementation:
         Returns:
             numpy.ndarray: [x, y, z] in kilometers in ECI (ICRF) frame
         """
-        eph = skyfield.load('de421.bsp')  # or 'de440s.bsp' if you want higher precision
-        sun = eph['sun']
-        earth = eph['earth']
 
         # Get Sun position relative to Earth in ICRF (equiv. to ECI)
-        sun_position_eci = earth.at(julian_date).observe(sun).position.km
+        sun_position_eci = self.earth.at(julian_date).observe(self.sun).position.km
+
         return sun_position_eci
 
     def simulate_sunsensor(
@@ -156,7 +176,7 @@ class SunsensorImplementation:
 
         if self.noise:
             angular_noise = np.random.uniform(
-                -self.angular_noise_max, self.angular_noise_max, 1
+                -self.angular_noise_max / 2, self.angular_noise_max / 2, 1
             )
             sun_sbf = tr.vector_angular_noise(sun_sbf, angular_noise[0])
 
@@ -222,6 +242,23 @@ class SensorFusionImplementation():
             )
             self.measurement_noise = measurement_noise
 
+    def _align_quaternion_sign(self, algorithm: str, quaternion: np.ndarray) -> np.ndarray:
+        """
+        Flip quaternion sign if needed to keep continuity with the last saved one.
+
+        Args:
+            algorithm (str): The algorithm used for sensor fusion.
+            quaternion (np.ndarray): The computed quaternion.
+        """
+        try:
+            prev_iter = max(self._data_dict[algorithm].keys())
+            quaternion_prev = self._data_dict[algorithm][prev_iter]
+            if np.dot(quaternion, quaternion_prev) < 0:
+                quaternion = -quaternion
+        except Exception:
+            pass
+        return quaternion
+
     def triad(
             self,
             v1_i: np.ndarray,
@@ -251,16 +288,23 @@ class SensorFusionImplementation():
             np.ndarray: quaternion representing the rotation from inertial to body
                 frame.
         """
+        v1_i = ut.normalize(v1_i)
+        v2_i = ut.normalize(v2_i)
+
         # Build TRIAD in inertial frame
         R_i = self.build_triad(v1_i, v2_i)
 
+        v1_b = ut.normalize(v1_b)
+        v2_b = ut.normalize(v2_b)
+        
         # Build TRIAD in body frame
         R_b = self.build_triad(v1_b, v2_b)
 
         # Rotation matrix from inertial to body frame
-        R = R_b @ R_i.T
+        R = np.matmul(R_b, R_i.T)
         quaternion = tr.rotation_matrix_to_quaternion(R)
         quaternion /= np.linalg.norm(quaternion)
+        quaternion = self._align_quaternion_sign("triad", quaternion)
         self.save_to_data_dict("triad", quaternion)
         return quaternion
 
@@ -280,10 +324,10 @@ class SensorFusionImplementation():
         Returns:
             np.ndarray: 3x3 rotation matrix representing the TRIAD frame.
         """
-        t1 = ut.normalize(v1)
+        t1 = v1
         t2 = ut.normalize(np.cross(v1, v2))
-        t3 = np.cross(t1, t2)
-        R = np.vstack((t1, t2, t3)).T  # 3x3 matrix
+        t3 = ut.normalize(np.cross(t1, t2))
+        R = np.column_stack((t1, t2, t3))  # 3x3 matrix
         return R
 
     def quest(
@@ -313,8 +357,10 @@ class SensorFusionImplementation():
         # Attitude Profile Matrix (B): sum of weighted outer product of two vectors in
         # the same frame
         B = np.zeros((3, 3))
-        for v_b, v_i, a in zip(v_b_list, v_i_list, self.weights):
-            B += a * np.outer(v_b, v_i)
+        for v_b, v_i, w in zip(v_b_list, v_i_list, self.weights):
+            v_b = ut.normalize(v_b)
+            v_i = ut.normalize(v_i)
+            B += w * np.outer(v_i, v_b)
 
         # create auxiliary matrices
         S = B + B.T
@@ -334,12 +380,13 @@ class SensorFusionImplementation():
         K[3, 3] = sigma
 
         # Eigenvector of max eigenvalue which is the optimal quaternion
-        eigvals, eigvecs = eig(K)
+        eigvals, eigvecs = eigh(K)
         max_index = np.argmax(eigvals.real)
         quaternion = eigvecs[:, max_index].real
         quaternion /= np.linalg.norm(quaternion)
+        quaternion = self._align_quaternion_sign("quest", quaternion)
         self.save_to_data_dict("quest", quaternion)
-        return ut.normalize(quaternion)
+        return quaternion
 
     def ekf(
             self,
@@ -353,7 +400,7 @@ class SensorFusionImplementation():
         Extended Kalman Filter (EKF) for attitude estimation based on
         gyroscope measurements and at least two vector measurements. It is a recursive
         algorithm (updates over time) that combines the gyroscope data (angular
-        velocity) with the vector measurements. The algorithm consists of two steps:
+        velocity) with the vector measurements (magnetic field and sun vector). The algorithm consists of two steps:
         prediction and update. The prediction is based on angular velocity, while the
         update incorporates the vector measurements. Compared to QUEST, EKF
         can handle noisy measurements and biases giving a comprehensive and
@@ -403,31 +450,21 @@ class SensorFusionImplementation():
         """
         corrected_angular_velocity = angular_velocity - self.gyro_bias
 
-        # Use rotation vector for integration
+        # Use rotation vector for integration (left-multiplicative update)
         delta_theta = corrected_angular_velocity * timestep
         delta_rotation = R.from_rotvec(delta_theta)
-        updated_rotation = R.from_quat(quaternion) * delta_rotation
+        updated_rotation = delta_rotation * R.from_quat(quaternion)
         quaternion = updated_rotation.as_quat()
         quaternion /= np.linalg.norm(quaternion)
 
-        # Build state transition matrix F
-        # F is the Jacobian of the state transition function
-        # it is a matrix of partial derivatives representing sensitivity of the
-        # output state is to input changes.
-        omega_norm = np.linalg.norm(corrected_angular_velocity)
+        # Build state transition matrix F (small-angle linearization)
         F = np.eye(6)
-        if omega_norm > 1e-5:
-            axis = corrected_angular_velocity / omega_norm
-            theta = omega_norm * timestep
-            skew_axis = ut.skew_symmetric(axis)
-            A = np.eye(3) - (theta / 2) * skew_axis + \
-                ((1 - np.cos(theta)) / (theta ** 2)) * (skew_axis @ skew_axis)
-            F[0:3, 3:6] = -A * timestep
-        else:
-            F[0:3, 3:6] = -np.eye(3) * timestep
+        Omega_x = ut.skew_symmetric(corrected_angular_velocity)  # [ω]×
+        F[0:3, 0:3] -= Omega_x * timestep
+        F[0:3, 3:6] = -np.eye(3) * timestep
 
         # Propagate covariance
-        self.covariance = F @ self.covariance @ F.T + self.process_noise
+        self.covariance = np.matmul(F, np.matmul(self.covariance, F.T)) + self.process_noise
         return quaternion
 
     def update_step(
@@ -466,18 +503,17 @@ class SensorFusionImplementation():
 
         # Kalman Gain determines how much to trust new measurements versus
         # the current prediction
-        S = H @ self.covariance @ H.T + self.measurement_noise
-        K = self.covariance @ H.T @ np.linalg.inv(S)
+        S = np.matmul(np.matmul(H, self.covariance), H.T) + self.measurement_noise
+        K = np.matmul(np.matmul(self.covariance, H.T), np.linalg.inv(S))
 
         # Update state
-        delta_state = K @ innovation
+        delta_state = np.matmul(K, innovation)
         delta_rotation = R.from_rotvec(delta_state[0:3])
-        updated_rotation = R.from_quat(quaternion) * delta_rotation
-
+        updated_rotation = delta_rotation * R.from_quat(quaternion)
         quaternion = updated_rotation.as_quat()
 
         self.gyro_bias += delta_state[3:6]
-        self.covariance = (np.eye(6) - K @ H) @ self.covariance
+        self.covariance = np.matmul((np.eye(6) - np.matmul(K, H)), self.covariance)
         quaternion /= np.linalg.norm(quaternion)
         return quaternion
 
