@@ -57,11 +57,11 @@ class MagnetometerImplementation:
         dt = julian_date.utc_datetime()
         start = datetime.datetime(dt.year, 1, 1, tzinfo=dt.tzinfo)
         end = datetime.datetime(dt.year + 1, 1, 1, tzinfo=dt.tzinfo)
-        dec_year = dt.year + (dt - start).total_seconds() / (end - start).total_seconds()
+        decimal_year = dt.year + (dt - start).total_seconds() / (end - start).total_seconds()
 
         # IGRF returns NED components in nT
-        _, _, _, Bn, Be, Bd, _ = pyIGRF.igrf_value(lat, lon, alt_km, dec_year)
-        return np.array([Bn, Be, Bd])  # NED, nT
+        _, _, _, b_n, b_e, b_d, _ = pyIGRF.igrf_value(lat, lon, alt_km, decimal_year)
+        return np.array([b_n, b_e, b_d])  # NED, nT
 
     def simulate_magnetometer(
         self,

@@ -11,6 +11,14 @@ def enu_to_ecef(
 ) -> np.ndarray:
     """
     Convert a vector from ENU (East-North-Up) to ECEF (Earth-Centered, Earth-Fixed).
+
+    Args:
+        enu_vec (np.ndarray): Vector in ENU frame.
+        lat_deg (float): Latitude in degrees.
+        lon_deg (float): Longitude in degrees.
+    
+    Returns:
+        np.ndarray: Vector in ECEF frame.
     """
     lat = np.deg2rad(lat_deg)
     lon = np.deg2rad(lon_deg)
@@ -21,8 +29,8 @@ def enu_to_ecef(
     # Standard ENU→ECEF rotation (columns are E,N,U expressed in ECEF)
     rot_enu_to_ecef = R.from_matrix(np.array([
         [-sλ,         cλ,        0.0],
-        [-sφ * cλ,   -sφ * sλ,   cφ ],
-        [ cφ * cλ,    cφ * sλ,   sφ ],
+        [-sφ * cλ,   -sφ * sλ,   cφ],
+        [cφ * cλ,    cφ * sλ,   sφ],
     ]))
     return rot_enu_to_ecef.apply(enu_vec)
 
@@ -30,6 +38,14 @@ def enu_to_ecef(
 def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
     """
     Convert a vector from NED (North, East, Down) to ECEF using ENU as an intermediate.
+
+    Args:
+        ned_vec (np.ndarray): Vector in NED frame.
+        lat_deg (float): Latitude in degrees.
+        lon_deg (float): Longitude in degrees.
+
+    Returns:
+        np.ndarray: Vector in ECEF frame.
     """
     # NED → ENU: [N, E, D] → [E, N, U] = [E=NED[1], N=NED[0], U=-NED[2]]
     enu = np.array([ned_vec[1], ned_vec[0], -ned_vec[2]], dtype=float)
@@ -217,49 +233,27 @@ def rotate_vector_by_quaternion(
     return rot.apply(vector)
 
 
-def to_earth_rotation(
-        position: np.ndarray, 
-        align_axis: np.ndarray | list,
-        quaternion: np.ndarray
+def earth_direction_body(
+    position_eci: np.ndarray,
+    quat_sb_from_eci: np.ndarray
 ) -> np.ndarray:
     """
-    Compute the quaternion that rotates align_axis (SBF) to point toward Earth in ECI.
+    Return unit vector in body frame pointing toward Earth's center (nadir).
 
     Args:
-        position (np.ndarray): Satellite position in ECI frame.
-        align_axis (np.ndarray | list): Axis in SBF to be aligned toward Earth (e.g., [0, 0, 1] for +Z).
-        quaternion (np.ndarray): Current quaternion from ECI to SBF.
+        position_eci (np.ndarray): Satellite position in ECI frame.
+        quat_sb_from_eci (np.ndarray): Quaternion rotating ECI -> body [x, y, z, w].
+
+    Returns:
+        np.ndarray: Unit Earth direction in body frame.
     """
-    position = np.asarray(position, dtype=float)
-    align_axis = np.asarray(align_axis, dtype=float)
-
-    # Target direction in ECI: toward Earth's center
-    r_norm = np.linalg.norm(position)
-    if r_norm == 0.0:
-        return np.array([0.0, 0.0, 0.0, 1.0])
-    to_earth_vector = -position / r_norm  # -r̂
-
-    # Current body axis expressed in ECI
-    align_axis_eci = sbf_to_eci(align_axis, quaternion)
-    a = align_axis_eci / (np.linalg.norm(align_axis_eci) + 1e-20)
-    b = to_earth_vector  # already unit
-
-    # Minimal quaternion rotating a -> b (handles antiparallel)
-    c = float(np.clip(np.dot(a, b), -1.0, 1.0))
-    if c > 0.999999:
-        rotation_quaternion = np.array([0.0, 0.0, 0.0, 1.0])
-    elif c < -0.999999:
-        axis = np.cross(a, np.array([1.0, 0.0, 0.0]))
-        if np.linalg.norm(axis) < 1e-8:
-            axis = np.cross(a, np.array([0.0, 1.0, 0.0]))
-        axis = axis / (np.linalg.norm(axis) + 1e-20)
-        rotation_quaternion = R.from_rotvec(np.pi * axis).as_quat()
-    else:
-        axis = np.cross(a, b)
-        s = np.sqrt((1.0 + c) * 2.0)
-        rotation_quaternion = np.array([axis[0] / s, axis[1] / s, axis[2] / s, 0.5 * s])
-
-    return rotation_quaternion
+    p = np.asarray(position_eci, dtype=float)
+    n = np.linalg.norm(p)
+    if n == 0.0:
+        return np.array([0.0, 0.0, -1.0])  # arbitrary fallback
+    to_earth_eci = -p / n
+    to_earth_body = rotate_vector_by_quaternion(to_earth_eci, quat_sb_from_eci)
+    return to_earth_body / (np.linalg.norm(to_earth_body) + 1e-20)
 
 
 def vector_angular_noise(vec: np.ndarray, angle_deg: float) -> np.ndarray:
@@ -287,5 +281,26 @@ def vector_angular_noise(vec: np.ndarray, angle_deg: float) -> np.ndarray:
     axis = axis / axis_norm
     # Create rotation
     rot = R.from_rotvec(axis * angle_rad)
-    q = rot.as_quat()
     return rot.apply(vec)
+
+
+def sun_direction_body(
+    sun_vector_eci: np.ndarray,
+    quat_sb_from_eci: np.ndarray
+) -> np.ndarray:
+    """
+    Return unit vector in body frame pointing toward the Sun.
+    sun_vector_eci: Sun direction (or position difference) in ECI frame.
+                    (Only direction is used; it will be normalized.)
+    quat_sb_from_eci: Quaternion rotating ECI -> body [x, y, z, w].
+
+    Returns:
+        np.ndarray: Unit Sun direction in body frame.
+    """
+    v = np.asarray(sun_vector_eci, dtype=float)
+    n = np.linalg.norm(v)
+    if n == 0.0:
+        return np.array([1.0, 0.0, 0.0])  # fallback
+    v_hat = v / n
+    sun_body = rotate_vector_by_quaternion(v_hat, quat_sb_from_eci)
+    return sun_body / np.linalg.norm(sun_body)

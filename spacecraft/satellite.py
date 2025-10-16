@@ -26,6 +26,11 @@ class SatelliteImplementation(Satellite):
         round_filter: bool = False,
         detumbling_threshold: float = 1,
         measurements_interval: int = 5,
+        pointing_angle_done_deg: float = 4.0,          # below this angle considered aligned
+        pointing_rate_done_deg_s: float = 0.1,         # below this body rate considered settled
+        pointing_dwell_time_s: float = 150,           # must satisfy conditions this long
+        # if error rises above → re-enable pointing
+        pointing_angle_reacquire_deg: float = 10.0,
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -89,6 +94,13 @@ class SatelliteImplementation(Satellite):
 
         self._torque = np.zeros(3)
         self._angular_acceleration = np.zeros(3)
+
+        self._pointing_error_angle = 0.0
+        self.pointing_angle_done_deg = pointing_angle_done_deg
+        self.pointing_rate_done_deg_s = pointing_rate_done_deg_s
+        self.pointing_dwell_time_s = pointing_dwell_time_s
+        self.pointing_angle_reacquire_deg = pointing_angle_reacquire_deg
+        self._pointing_ok_counter = 0
 
     def update_iteration(self, iteration: int) -> None:
         """
@@ -337,7 +349,7 @@ class SatelliteImplementation(Satellite):
         Returns:
             np.ndarray: Pointing error angle in degrees.
         """
-        return self.magnetorquer.pointing_error_angle
+        return self._pointing_error_angle
 
     @property
     def torque(self) -> np.ndarray:
@@ -492,36 +504,78 @@ class SatelliteImplementation(Satellite):
             method (str): The method to use for pointing control. Currently,
                 only 'b_cross' is supported.
             task (str): The task which the B-cross should perform. As the algorithm is
-                dedicated to pointing, currently 'earth-pointing' and 'sun-pointing'
+                dedicated to pointing, currently 'earth_pointing' and 'sun_pointing'
                 are supported.
             align_axis (np.ndarray | list): The axis which should be rotated towards
                 the given target.
 
         """
-        if method == "b_cross" and self.start_pointing:
-            angular_acceleration = self.magnetorquer.b_cross(
-                self.magnetic_field[1],
-                self.magnetic_field[0],
-                task,
-                align_axis
-            )
-            self._angular_velocity = self.angular_velocity - ut.rad_to_degrees(angular_acceleration)
 
+        if task == "earth_pointing":
+            target_dir_body = tr.earth_direction_body(self.position, self.quaternion)
+        elif task == "sun_pointing":
+            target_dir_body = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
+
+        self._pointing_error_angle = ut.calculate_pointing_error(
+            target_dir_body,
+            align_axis
+        )
+
+        if method == "b_cross" and self.start_pointing:
+            # One measurement for both frames (consistent noise/time)
+            mag_sbf, _ = self.magnetic_field
+            angular_acceleration = self.magnetorquer.b_cross(
+                mag_sbf,
+                align_axis,
+                target_dir_body
+            )
+            self._angular_velocity = self.angular_velocity + \
+                ut.rad_to_degrees(angular_acceleration)
             self._torque = self.magnetorquer.torque
             self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
 
-    def detumbling_pointing_switch(self) -> None:
+    def manage_modes(self) -> None:
         """
-        Validate the angular velocity to determine if detumbling should stop or start
-        again. Initially set to True.
+        Mode manager for detumbling / pointing / idle.
+        - Starts pointing after detumbling when rate below detumbling_threshold.
+        - Finishes pointing after dwell in low-error, low-rate state.
+        - Re-enters detumbling if rate grows high again.
+        - Re-enables pointing if error drifts after completion.
         """
-        if self.start_detumbling and np.linalg.norm(self.angular_velocity) <= self.detumbling_threshold:
+        ang_rate_norm = np.linalg.norm(self.angular_velocity)
+        pointing_err = self.pointing_error_angle
+
+        # 1. Detumbling -> Pointing
+        if self.start_detumbling and ang_rate_norm <= self.detumbling_threshold:
             self.start_detumbling = False
             self.start_pointing = True
+            self._pointing_ok_counter = 0
             print(
-                f"Detumbling stopped, angular velocity is below threshold {self.detumbling_threshold}.")
-        elif not self.start_detumbling and np.linalg.norm(self.angular_velocity) >= self.detumbling_threshold * 2:
+                f"Detumbling stopped (|ω|={ang_rate_norm:.2f} deg/s). Pointing started.")
+
+        # 2. Revert to detumbling if rates explode
+        elif not self.start_detumbling and ang_rate_norm >= self.detumbling_threshold * 2.0:
             self.start_detumbling = True
             self.start_pointing = False
-            print(
-                f"Detumbling started, angular velocity increased above threshold {self.detumbling_threshold * 2}.")
+            self._pointing_ok_counter = 0
+            print(f"Detumbling restarted (|ω|={ang_rate_norm:.2f} deg/s).")
+
+        # 3. Pointing completion detection
+        if self.start_pointing:
+            if (pointing_err <= self.pointing_angle_done_deg and
+                    ang_rate_norm <= self.pointing_rate_done_deg_s):
+                self._pointing_ok_counter += 1
+            else:
+                self._pointing_ok_counter = 0
+
+            if self._pointing_ok_counter >= self.pointing_dwell_time_s:
+                self.start_pointing = False
+                print(
+                    f"Pointing completed (angle≈{pointing_err:.2f}°, rate≈{ang_rate_norm:.3f} deg/s).")
+
+        # 4. Re-acquire pointing if it drifted after completion
+        if (not self.start_pointing and not self.start_detumbling and
+                pointing_err >= self.pointing_angle_reacquire_deg):
+            self.start_pointing = True
+            self._pointing_ok_counter = 0
+            print(f"Pointing re-enabled (drift angle={pointing_err:.1f}°).")

@@ -265,3 +265,42 @@ def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
     """
     return np.round(array, decimal_places)
 
+
+def limit_norm(vector: np.ndarray, cap: float) -> np.ndarray:
+    """
+    Limit the Euclidean norm of a vector to 'cap' without changing direction.
+    If cap <= 0 or ||v|| <= cap, returns the original vector.
+
+    Args:
+        vector (np.ndarray): Input vector.
+        cap (float): Maximum allowed norm.
+
+    Returns:
+        np.ndarray: Vector with limited norm.
+    """
+    n = float(np.linalg.norm(vector))
+    if cap <= 0.0 or n <= cap:
+        return vector
+    return vector * (cap / n)
+
+
+def calculate_pointing_error(
+    target_vector: np.ndarray,
+    current_vector: np.ndarray
+) -> float:
+    """
+    Calculate the pointing error angle between two vectors in degrees.
+
+    Args:
+        target_vector (np.ndarray): Target direction vector.
+        current_vector (np.ndarray): Current direction vector.
+
+    Returns:
+        float: Pointing error angle in degrees.
+    """
+    target_vector = target_vector / np.linalg.norm(target_vector)
+    current_vector = current_vector / np.linalg.norm(current_vector)
+    dot_product = np.clip(np.dot(target_vector, current_vector), -1.0, 1.0)
+    angle_rad = np.arccos(dot_product)
+    angle_deg = np.degrees(angle_rad)
+    return angle_deg
