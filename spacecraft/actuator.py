@@ -22,8 +22,8 @@ class MagnetorquerImplementation:
             magnetic_field_ref: float = 45000,  # nT
             beta: float = 0.5,
             k_p: float = 0.2,
-            k_c: float = 0.1,
-            k_cp: float = 0.1,
+            k_c: float = 0.03,
+            k_cp: float = 0.35,
     ):
         # TODO add bang-bang control
         """
@@ -257,59 +257,65 @@ class MagnetorquerImplementation:
     ) -> np.ndarray:
         """
         B-cross pointing control (nadir). Generates angular acceleration (rad/s^2).
-
-        m_align = k_c * (B × e)/|B|^2,  e = a_b × t_b
-        m_damp  = -k_p * (B × ω)/|B|^2
+        Single switching threshold at 10 deg.
         """
+        # ---------- tuning (single-threshold design) ----------
+        threshold_deg = 11.0
+        align_scale_near = 0.86      # was 0.83
+        damp_scale_near = 1.32      # was 1.30
+        gamma = 0.56      # was 0.57 (more budget to damping)
+        authority_floor = 0.24      # was 0.22
+        # ------------------------------------------------------
+
         magnetic_field_sb = magnetic_field_sbf * 1e-9  # nT to T
-        align_axis /= np.linalg.norm(align_axis)
+        align_axis = np.asarray(align_axis, dtype=float)
+        align_axis = align_axis / (np.linalg.norm(align_axis) + 1e-20)
 
         # Geometric error e = a × t
         error_vec = np.cross(align_axis, target_dir_body)
         cos_at = float(np.clip(np.dot(align_axis, target_dir_body), -1.0, 1.0))
         angle_rad = float(np.arccos(cos_at))
 
-        # Degeneracy fallback (near 0 or 180) to keep direction well-defined
+        # Degeneracy fallback
         if np.linalg.norm(error_vec) < 1e-8 and angle_rad > 1e-6:
             aux = np.cross(align_axis, np.array([1.0, 0.0, 0.0]))
             if np.linalg.norm(aux) < 1e-8:
                 aux = np.cross(align_axis, np.array([0.0, 1.0, 0.0]))
             error_vec = aux / (np.linalg.norm(aux) + 1e-20)
 
-        # Rates and gains
+        # Rates and base gains
         angular_velocity_rad_s = ut.degrees_to_rad(self._satellite.angular_velocity)
         gain_align = self.k_c * self.m_max if self.k_c <= 1.0 else self.k_c
         gain_damp = self.k_cp * self.m_max if self.k_cp <= 1.0 else self.k_cp
 
-        magnetic_field_sq = float(np.dot(magnetic_field_sb, magnetic_field_sb))
-        if magnetic_field_sq <= 0.0:
+        B2 = float(np.dot(magnetic_field_sb, magnetic_field_sb))
+        if B2 <= 0.0:
             commanded_dipole = np.zeros(3)
         else:
-            # ---------- Small-angle gain shaping (stabilize near alignment) ----------
-            # Angle where full align gain is allowed
-            angle_ref_deg = 20
-            angle_ref_rad = np.deg2rad(angle_ref_deg)
-            # Scale 0→1 as angle goes 0→angle_ref
-            small_angle_scale = min(1.0, angle_rad / (angle_ref_rad + 1e-12))
-            # Effective gains: reduce align near 0, boost damping near 0
-            gain_align_eff = gain_align * small_angle_scale
-            # Damping boost factor (e.g. up to +60% at zero angle)
-            gain_damp_eff = gain_damp * (1.0 + (1.0 - small_angle_scale) * 0.9)
-            # -------------------------------------------------------------------------
+            angle_deg = ut.rad_to_degrees(angle_rad)
 
-            # Correct-sign dipoles (projected PD torque τ_des = -K_p e - K_d ω)
-            dipole_align_raw = -gain_align_eff * np.cross(magnetic_field_sb, error_vec) / magnetic_field_sq
-            dipole_damp_raw = -gain_damp_eff * np.cross(magnetic_field_sb, angular_velocity_rad_s) / magnetic_field_sq
+            # Authority weighting (reduces align when B ≈ target)
+            B_unit = magnetic_field_sb / (np.sqrt(B2) + 1e-20)
+            cos_B_t = float(np.clip(np.dot(B_unit, target_dir_body), -1.0, 1.0))
+            authority = max(np.sqrt(max(0.0, 1.0 - cos_B_t * cos_B_t)), authority_floor)
 
-            # Deadband (keep damping only very close to alignment)
-            if angle_rad < np.deg2rad(5.0) and np.linalg.norm(angular_velocity_rad_s) < np.deg2rad(0.1):
-                dipole_align_raw *= 0.0
+            # Single-threshold shaping
+            if angle_deg <= threshold_deg:
+                gain_align_eff = gain_align * align_scale_near
+                gain_damp_eff = gain_damp * damp_scale_near
+            else:
+                gain_align_eff = gain_align
+                gain_damp_eff = gain_damp
 
-            # Simple saturation budget
-            gamma = 0.7
-            dipole_align = ut.limit_norm(dipole_align_raw, gamma * self.m_max)
-            dipole_damp = ut.limit_norm(dipole_damp_raw,  (1.0 - gamma) * self.m_max)
-            commanded_dipole = dipole_align + dipole_damp
+            # Classic B-cross (dipole space)
+            m_align_raw = -gain_align_eff * authority * \
+                np.cross(magnetic_field_sb, error_vec) / B2
+            m_damp_raw = -gain_damp_eff * \
+                np.cross(magnetic_field_sb, angular_velocity_rad_s) / B2
+
+            m_align = ut.limit_norm(m_align_raw, gamma * self.m_max)
+            m_damp = ut.limit_norm(m_damp_raw,  (1.0 - gamma) * self.m_max)
+            commanded_dipole = m_align + m_damp
 
         # Actuation and resulting angular acceleration
         current_per_axis = self.apply_torquer_with_saturation(commanded_dipole)
