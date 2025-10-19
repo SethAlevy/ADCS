@@ -23,7 +23,7 @@ class MagnetorquerImplementation:
             beta: float = 0.5,
             k_p: float = 0.2,
             k_c: float = 0.03,
-            k_cp: float = 0.35,
+            k_cp: float = 0.33,
     ):
         # TODO add bang-bang control
         """
@@ -263,13 +263,15 @@ class MagnetorquerImplementation:
         threshold_deg = 11.0
         align_scale_near = 0.86      # was 0.83
         damp_scale_near = 1.32      # was 1.30
-        gamma = 0.56      # was 0.57 (more budget to damping)
+        gamma = 0.56      # was 0.57 (more damping share)
         authority_floor = 0.24      # was 0.22
         # ------------------------------------------------------
 
         magnetic_field_sb = magnetic_field_sbf * 1e-9  # nT to T
         align_axis = np.asarray(align_axis, dtype=float)
         align_axis = align_axis / (np.linalg.norm(align_axis) + 1e-20)
+        # Always use a unit target for correct angle/authority logic
+        target_dir_body = ut.normalize(target_dir_body)
 
         # Geometric error e = a × t
         error_vec = np.cross(align_axis, target_dir_body)

@@ -25,14 +25,10 @@ class SatelliteImplementation(Satellite):
         sensor_fusion: SensorFusion = None,
         detumbling_threshold: float = 1,
         measurements_interval: int = 5,
-        pointing_angle_done_deg: float = 1.8,
-        # relaxed slightly toward 2.0
-        pointing_rate_done_deg_s: float = 0.075,
-        # relaxed slightly toward 0.08
-        pointing_dwell_time_s: float = 300,
-        # keep pointing ON much longer when centered
-        pointing_angle_reacquire_deg: float = 3.5,
-        # toward 4.0
+        pointing_angle_done_deg: float = 1.6,      # finish only a bit tighter
+        pointing_rate_done_deg_s: float = 0.070,   # slightly stricter rate
+        pointing_dwell_time_s: float = 300,        # stay ON longer when centered
+        pointing_angle_reacquire_deg: float = 3.0,  # re-enable early
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -94,7 +90,7 @@ class SatelliteImplementation(Satellite):
         self._torque = np.zeros(3)
         self._angular_acceleration = np.zeros(3)
 
-        self._pointing_error_angle = 0.0
+        self._pointing_error_angle: float = 0.0
         self.pointing_angle_done_deg = pointing_angle_done_deg
         self.pointing_rate_done_deg_s = pointing_rate_done_deg_s
         self.pointing_dwell_time_s = pointing_dwell_time_s
@@ -502,16 +498,17 @@ class SatelliteImplementation(Satellite):
             align_axis
         )
 
-        mag_sbf, _ = self.magnetic_field
-        angular_acceleration = self.magnetorquer.b_cross(
-            mag_sbf,
-            align_axis,
-            target_dir_body
-        )
-        self._angular_velocity = self.angular_velocity + \
-            ut.rad_to_degrees(angular_acceleration)
-        self._torque = self.magnetorquer.torque
-        self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
+        if self.start_pointing:
+            mag_sbf, _ = self.magnetic_field
+            angular_acceleration = self.magnetorquer.b_cross(
+                mag_sbf,
+                align_axis,
+                target_dir_body
+            )
+            self._angular_velocity = self.angular_velocity + \
+                ut.rad_to_degrees(angular_acceleration)
+            self._torque = self.magnetorquer.torque
+            self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
 
         # Remember context for re-acquire when pointing is off
         self._last_pointing_task = task
