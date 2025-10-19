@@ -160,19 +160,19 @@ def plot_magnetic_field_sbf(
     ax.set_ylabel('Magnetic Field (nT)', color='tab:blue')
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_sbf_x'],
+        state_vector['magnetic_field_sbf_x'],
         color='tab:blue',
         label='SBF X'
     )
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_sbf_y'],
+        state_vector['magnetic_field_sbf_y'],
         color='tab:orange',
         label='SBF Y'
     )
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_sbf_z'],
+        state_vector['magnetic_field_sbf_z'],
         color='tab:green',
         label='SBF Z'
     )
@@ -210,19 +210,19 @@ def plot_magnetic_field_eci(
     ax.set_ylabel('Magnetic Field (nT)', color='tab:blue')
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_eci_x'],
+        state_vector['magnetic_field_eci_x'],
         color='tab:blue',
         label='ECI X'
     )
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_eci_y'],
+        state_vector['magnetic_field_eci_y'],
         color='tab:orange',
         label='ECI Y'
     )
     ax.plot(
         state_vector.index,
-        state_vector['mag_field_eci_z'],
+        state_vector['magnetic_field_eci_z'],
         color='tab:green',
         label='ECI Z'
     )
@@ -258,12 +258,12 @@ def plot_angular_velocity(
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Angular Velocity (deg/s)', color='tab:blue')
-    ax.plot(state_vector.index, state_vector['wx'], color='tab:blue', label='wx')
-    ax.plot(state_vector.index, state_vector['wy'], color='tab:orange', label='wy')
-    ax.plot(state_vector.index, state_vector['wz'], color='tab:green', label='wz')
+    ax.plot(state_vector.index, state_vector['angular_velocity_x'], color='tab:blue', label='wx')
+    ax.plot(state_vector.index, state_vector['angular_velocity_y'], color='tab:orange', label='wy')
+    ax.plot(state_vector.index, state_vector['angular_velocity_z'], color='tab:green', label='wz')
 
     angular_velocity_magn = np.sqrt(
-        state_vector['wx'] ** 2 + state_vector['wy'] ** 2 + state_vector['wz'] ** 2
+        state_vector['angular_velocity_x'] ** 2 + state_vector['angular_velocity_y'] ** 2 + state_vector['angular_velocity_z'] ** 2
     )
 
     ax.plot(state_vector.index, angular_velocity_magn, color='tab:red', label='|w|')
@@ -301,19 +301,19 @@ def plot_euler_angles(
     ax.set_ylabel('Euler Angles (degrees)', color='tab:blue')
     ax.plot(
         state_vector.index,
-        state_vector['euler_x1'],
+        state_vector['euler_angles_x1'],
         color='tab:blue',
         label='roll (Phi)'
     )
     ax.plot(
         state_vector.index,
-        state_vector['euler_y1'],
+        state_vector['euler_angles_y1'],
         color='tab:orange',
         label='pitch (Theta)'
     )
     ax.plot(
         state_vector.index,
-        state_vector['euler_z1'],
+        state_vector['euler_angles_z1'],
         color='tab:green',
         label='yaw (Psi)'
     )

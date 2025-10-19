@@ -4,6 +4,8 @@ import skyfield.api as skyfield
 from templates.satellite_template import Satellite
 
 
+
+
 def time_julian_date(satellite: Satellite) -> skyfield.Time:
     """
     Convert the current epoch to Julian Date. Current date is the epoch
@@ -28,20 +30,14 @@ def time_julian_date(satellite: Satellite) -> skyfield.Time:
     return new_time
 
 
-def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
+def basic_state_vector(satellite: Satellite) -> None:
     """
-    Initialize the state vector of the satellite.
+    Add the most important parameters to the state vector.
 
     Args:
         satellite (Satellite): The satellite object containing
             the TLE data and current status.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the initial state vector of the
-            satellite. The state vector includes position, velocity, latitude,
-            longitude and altitude etc.
     """
-    # Get the initial position and velocity
     position = satellite.position
     velocity = satellite.linear_velocity
 
@@ -51,117 +47,21 @@ def initialize_state_vector(satellite: Satellite) -> pd.DataFrame:
     euler_angles = satellite.euler_angles
     angular_velocity = satellite.angular_velocity
 
-    # Create a DataFrame to store the state vector
-    state_vector = pd.DataFrame(
-        {
-            "position_x": position[0],
-            "position_y": position[1],
-            "position_z": position[2],
-            "velocity_x": velocity[0],
-            "velocity_y": velocity[1],
-            "velocity_z": velocity[2],
-            "latitude": satellite.latitude,
-            "longitude": satellite.longitude,
-            "altitude": satellite.altitude,
-            "euler_x1": euler_angles[0],
-            "euler_y1": euler_angles[1],
-            "euler_z1": euler_angles[2],
-            "wx": angular_velocity[0],
-            "wy": angular_velocity[1],
-            "wz": angular_velocity[2],
-            "mag_field_sbf_x": mag_field_sbf[0],
-            "mag_field_sbf_y": mag_field_sbf[1],
-            "mag_field_sbf_z": mag_field_sbf[2],
-            "mag_field_eci_x": mag_field_eci[0],
-            "mag_field_eci_y": mag_field_eci[1],
-            "mag_field_eci_z": mag_field_eci[2],
-            "sun_vector_sbf_x": sun_vector_sbf[0],
-            "sun_vector_sbf_y": sun_vector_sbf[1],
-            "sun_vector_sbf_z": sun_vector_sbf[2],
-            "sun_vector_eci_x": sun_vector_eci[0],
-            "sun_vector_eci_y": sun_vector_eci[1],
-            "sun_vector_eci_z": sun_vector_eci[2],
-            "torque_x": satellite.torque[0],
-            "torque_y": satellite.torque[1],
-            "torque_z": satellite.torque[2],
-            "angular_acceleration_x": satellite._angular_acceleration[0],
-            "angular_acceleration_y": satellite._angular_acceleration[1],
-            "angular_acceleration_z": satellite._angular_acceleration[2],
-            "pointing_error": satellite.pointing_error_angle
-        },
-        index=[0],
-    )
-
-    return state_vector
-
-
-def update_state_vector(
-        satellite: Satellite,
-        state_vector: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Update the state vector of the satellite.
-
-    Args:
-        satellite (Satellite): The satellite object containing
-            the TLE data and current status.
-        state_vector (pd.DataFrame): The DataFrame containing the current state
-            vector of the satellite.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the updated state vector of the
-            satellite. The state vector includes position, velocity, latitude,
-            longitude and altitude etc.
-    """
-    # Get the new position and velocity
-    position = satellite.position
-    velocity = satellite.linear_velocity
-
-    mag_field_sbf, mag_field_eci = satellite.magnetic_field
-    sun_vector_sbf, sun_vector_eci = satellite.sun_vector
-
-    euler_angles = satellite.euler_angles
-    angular_velocity = satellite.angular_velocity
-
-    # Update the DataFrame with the new values
-    state_vector.loc[satellite.iteration] = {
-        "position_x": position[0],
-        "position_y": position[1],
-        "position_z": position[2],
-        "velocity_x": velocity[0],
-        "velocity_y": velocity[1],
-        "velocity_z": velocity[2],
-        "latitude": satellite.latitude,
-        "longitude": satellite.longitude,
-        "altitude": satellite.altitude,
-        "euler_x1": euler_angles[0],
-        "euler_y1": euler_angles[1],
-        "euler_z1": euler_angles[2],
-        "wx": angular_velocity[0],
-        "wy": angular_velocity[1],
-        "wz": angular_velocity[2],
-        "mag_field_sbf_x": mag_field_sbf[0],
-        "mag_field_sbf_y": mag_field_sbf[1],
-        "mag_field_sbf_z": mag_field_sbf[2],
-        "mag_field_eci_x": mag_field_eci[0],
-        "mag_field_eci_y": mag_field_eci[1],
-        "mag_field_eci_z": mag_field_eci[2],
-        "sun_vector_sbf_x": sun_vector_sbf[0],
-        "sun_vector_sbf_y": sun_vector_sbf[1],
-        "sun_vector_sbf_z": sun_vector_sbf[2],
-        "sun_vector_eci_x": sun_vector_eci[0],
-        "sun_vector_eci_y": sun_vector_eci[1],
-        "sun_vector_eci_z": sun_vector_eci[2],
-        "torque_x": satellite.torque[0],
-        "torque_y": satellite.torque[1],
-        "torque_z": satellite.torque[2],
-        "angular_acceleration_x": satellite._angular_acceleration[0],
-        "angular_acceleration_y": satellite._angular_acceleration[1],
-        "angular_acceleration_z": satellite._angular_acceleration[2],
-        "pointing_error": satellite.pointing_error_angle
-    }
-
-    return state_vector
+    satellite._state_vector.register_vector("position", position, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("velocity", velocity, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_value("latitude", satellite.latitude)
+    satellite._state_vector.register_value("longitude", satellite.longitude)
+    satellite._state_vector.register_value("altitude", satellite.altitude)
+    satellite._state_vector.register_vector("euler_angles", euler_angles, labels=['x1', 'y1', 'z1'])
+    satellite._state_vector.register_vector("angular_velocity", angular_velocity, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("magnetic_field_sbf", mag_field_sbf, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("magnetic_field_eci", mag_field_eci, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("sun_vector_sbf", sun_vector_sbf, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("sun_vector_eci", sun_vector_eci, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("torque", satellite.torque, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector("angular_acceleration", satellite._angular_acceleration, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_value("pointing_error", satellite.pointing_error_angle)
+    satellite._state_vector.register_vector("quaternion", satellite.quaternion, labels=['x', 'y', 'z', 'w'])
 
 
 def get_lla(satellite: Satellite) -> tuple:

@@ -9,6 +9,8 @@ from templates.sensors_template import SensorFusion
 import skyfield.api as skyfield
 import core.utilities as ut
 import core.transformations as tr
+from core.state import State
+import pandas as pd
 
 
 class SatelliteImplementation(Satellite):
@@ -25,10 +27,11 @@ class SatelliteImplementation(Satellite):
         sensor_fusion: SensorFusion = None,
         detumbling_threshold: float = 1,
         measurements_interval: int = 5,
-        pointing_angle_done_deg: float = 1.6,      # finish only a bit tighter
-        pointing_rate_done_deg_s: float = 0.070,   # slightly stricter rate
-        pointing_dwell_time_s: float = 300,        # stay ON longer when centered
-        pointing_angle_reacquire_deg: float = 3.0,  # re-enable early
+        pointing_angle_done_deg: float = 1.8,
+        pointing_rate_done_deg_s: float = 0.075,
+        pointing_dwell_time_s: float = 135,
+        pointing_angle_reacquire_deg: float = 3.5,
+        min_authority_for_dwell: float = 0.22,  # do not finish pointing in poor geometry
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -82,6 +85,7 @@ class SatelliteImplementation(Satellite):
 
         self.sensor_fusion = sensor_fusion
         self.magnetorquer = MagnetorquerImplementation(self.setup, self)
+        self._state_vector = State()
 
         self.detumbling_threshold = detumbling_threshold
         self.start_detumbling = True
@@ -95,6 +99,7 @@ class SatelliteImplementation(Satellite):
         self.pointing_rate_done_deg_s = pointing_rate_done_deg_s
         self.pointing_dwell_time_s = pointing_dwell_time_s
         self.pointing_angle_reacquire_deg = pointing_angle_reacquire_deg
+        self.min_authority_for_dwell = float(min_authority_for_dwell)
         self._pointing_ok_counter = 0
         # Remember last pointing context for re-acquire
         self._last_pointing_task: str | None = None
@@ -312,7 +317,7 @@ class SatelliteImplementation(Satellite):
     @property
     def pointing_error_angle(self) -> np.ndarray:
         """
-        Get the pointing error angle in degrees. This is the angle between the 
+        Get the pointing error angle in degrees. This is the angle between the
         vector that the satellite is aligned to and the Earth vector in ECI frame.
         Initialized as 0.0 and updated after pointing was launched.
 
@@ -348,6 +353,10 @@ class SatelliteImplementation(Satellite):
             return self._angular_acceleration
         else:
             return np.zeros(3)
+
+    @property
+    def state_vector(self) -> State:
+        return self._state_vector
 
     def apply_rotation(self) -> None:
         """
@@ -445,7 +454,7 @@ class SatelliteImplementation(Satellite):
 
         Args:
             adapt_magnetic (bool): If True, uses adaptive magnetic field
-                magnitude for detumbling.   
+                magnitude for detumbling.
             adapt_velocity (bool): If True, uses adaptive angular velocity
                 magnitude for detumbling.
             proportional (bool): If True, adds proportional control term to the
@@ -537,10 +546,28 @@ class SatelliteImplementation(Satellite):
         - Re-enables pointing if error drifts after completion.
         """
         ang_rate_norm = np.linalg.norm(self.angular_velocity)
-        # Keep error fresh even when pointing is OFF, so re-acquire can trigger
         if not self.start_pointing:
             self._update_pointing_error_noact()
         pointing_err = self.pointing_error_angle
+
+        # Estimate magnetic authority like in b_cross: sin(angle(B, target))
+        authority = 1.0
+        try:
+            B_sbf, _ = self.magnetic_field
+            B = B_sbf * 1e-9
+            Bn = np.linalg.norm(B) + 1e-20
+            # Use last task context; default to earth pointing
+            task = self._last_pointing_task or "earth_pointing"
+            if task == "earth_pointing":
+                tgt = tr.earth_direction_body(self.position, self.quaternion)
+            else:
+                tgt = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
+            t_unit = ut.normalize(tgt)
+            B_unit = B / Bn
+            c = float(np.clip(np.dot(B_unit, t_unit), -1.0, 1.0))
+            authority = float(np.sqrt(max(0.0, 1.0 - c * c)))
+        except Exception:
+            authority = 1.0
 
         # 1. Detumbling -> Pointing
         if self.start_detumbling and ang_rate_norm <= self.detumbling_threshold:
@@ -557,18 +584,17 @@ class SatelliteImplementation(Satellite):
             self._pointing_ok_counter = 0
             print(f"Detumbling restarted (|ω|={ang_rate_norm:.2f} deg/s).")
 
-        # 3. Pointing completion detection
+        # 3. Pointing completion detection (gate by authority)
         if self.start_pointing:
             if (pointing_err <= self.pointing_angle_done_deg and
-                    ang_rate_norm <= self.pointing_rate_done_deg_s):
+                ang_rate_norm <= self.pointing_rate_done_deg_s and
+                authority >= self.min_authority_for_dwell):
                 self._pointing_ok_counter += 1
             else:
                 self._pointing_ok_counter = 0
-
             if self._pointing_ok_counter >= self.pointing_dwell_time_s:
                 self.start_pointing = False
-                print(
-                    f"Pointing completed (angle≈{pointing_err:.2f}°, rate≈{ang_rate_norm:.3f} deg/s).")
+                print(f"Pointing completed (angle≈{pointing_err:.2f}°, rate≈{ang_rate_norm:.3f} deg/s).")
 
         # 4. Re-acquire pointing if it drifted after completion
         if (not self.start_pointing and not self.start_detumbling and
