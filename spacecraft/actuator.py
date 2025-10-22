@@ -22,8 +22,8 @@ class MagnetorquerImplementation:
             magnetic_field_ref: float = 45000,  # nT
             beta: float = 0.5,
             k_p: float = 0.2,
-            k_c: float = 0.03,
-            k_cp: float = 0.33,
+            k_c: float = 5e-4,
+            k_cp: float = 1e-2,  # a bit more damping gain
     ):
         # TODO add bang-bang control
         """
@@ -259,13 +259,6 @@ class MagnetorquerImplementation:
         B-cross pointing control (nadir). Generates angular acceleration (rad/s^2).
         Single switching threshold at 10 deg.
         """
-        # ---------- tuning (single-threshold design) ----------
-        threshold_deg = 11.0
-        align_scale_near = 0.83
-        damp_scale_near = 1.30
-        gamma = 0.57
-        authority_floor = 0.22
-        # ------------------------------------------------------
 
         magnetic_field_sb = magnetic_field_sbf * 1e-9  # nT to T
         align_axis = np.asarray(align_axis, dtype=float)
@@ -274,58 +267,25 @@ class MagnetorquerImplementation:
 
         # Geometric error e = a × t
         error_vec = np.cross(align_axis, target_dir_body)
-        cos_at = float(np.clip(np.dot(align_axis, target_dir_body), -1.0, 1.0))
-        angle_rad = float(np.arccos(cos_at))
-        angle_deg_all = float(ut.rad_to_degrees(angle_rad))  # available for logging
-
-        # Degeneracy fallback
-        if np.linalg.norm(error_vec) < 1e-8 and angle_rad > 1e-6:
-            aux = np.cross(align_axis, np.array([1.0, 0.0, 0.0]))
-            if np.linalg.norm(aux) < 1e-8:
-                aux = np.cross(align_axis, np.array([0.0, 1.0, 0.0]))
-            error_vec = aux / (np.linalg.norm(aux) + 1e-20)
 
         # Rates and base gains
         angular_velocity_rad_s = ut.degrees_to_rad(self._satellite.angular_velocity)
         gain_align = self.k_c * self.m_max if self.k_c <= 1.0 else self.k_c
         gain_damp = self.k_cp * self.m_max if self.k_cp <= 1.0 else self.k_cp
 
-        # Defaults for debug metrics (NaN-safe when B2 <= 0)
-        gain_align_eff = np.nan
-        gain_damp_eff = np.nan
-        authority = np.nan
-        m_align_raw = np.zeros(3)
-        m_damp_raw = np.zeros(3)
-        commanded_dipole = np.zeros(3)
-        near_flag_val = float(angle_deg_all <= threshold_deg)
-
         B2 = float(np.dot(magnetic_field_sb, magnetic_field_sb))
         if B2 <= 0.0:
             commanded_dipole = np.zeros(3)
         else:
-            angle_deg = angle_deg_all
-
-            # Authority weighting (reduces align when B ≈ target)
-            B_unit = magnetic_field_sb / (np.sqrt(B2) + 1e-20)
-            cos_B_t = float(np.clip(np.dot(B_unit, target_dir_body), -1.0, 1.0))
-            authority = max(np.sqrt(max(0.0, 1.0 - cos_B_t * cos_B_t)), authority_floor)
-
-            # Single-threshold shaping
-            if angle_deg <= threshold_deg:
-                gain_align_eff = gain_align * align_scale_near
-                gain_damp_eff = gain_damp * damp_scale_near
-            else:
-                gain_align_eff = gain_align
-                gain_damp_eff = gain_damp
 
             # Classic B-cross (dipole space)
-            m_align_raw = -gain_align_eff * authority * \
+            m_align_raw = -gain_align * \
                 np.cross(magnetic_field_sb, error_vec) / B2
-            m_damp_raw = -gain_damp_eff * \
+            m_damp_raw = -gain_damp * \
                 np.cross(magnetic_field_sb, angular_velocity_rad_s) / B2
 
-            m_align = ut.limit_norm(m_align_raw, gamma * self.m_max)
-            m_damp = ut.limit_norm(m_damp_raw,  (1.0 - gamma) * self.m_max)
+            m_align = ut.limit_norm(m_align_raw, self.m_max)
+            m_damp = ut.limit_norm(m_damp_raw, self.m_max)
             commanded_dipole = m_align + m_damp
 
         # Actuation and resulting angular acceleration
@@ -333,42 +293,11 @@ class MagnetorquerImplementation:
         angular_acceleration_rad_s2 = self.current_to_angular_acceleration(
             current_per_axis, magnetic_field_sb
         )
-        # ---- lightweight diagnostics to State (auto-NaN backfilled by State) ----
-        sv = self._satellite.state_vector
-        sv.register_value("angle_err_deg", angle_deg_all)
-        sv.register_value("angle_deg", angle_deg_all)
-        sv.register_value("near_flag", near_flag_val)
-        sv.register_value("omega_norm_deg_s", float(
-            np.degrees(np.linalg.norm(angular_velocity_rad_s))))
-        sv.register_value("B_norm_uT", float(np.linalg.norm(magnetic_field_sb) * 1e6))
-        sv.register_value("authority", float(authority)
-                          if np.isfinite(authority) else np.nan)
-        sv.register_value("gain_align_eff", float(gain_align_eff)
-                          if np.isfinite(gain_align_eff) else np.nan)
-        sv.register_value("gain_damp_eff", float(gain_damp_eff)
-                          if np.isfinite(gain_damp_eff) else np.nan)
-        sv.register_value("gamma", float(gamma))
-        sv.register_value("authority_floor", float(authority_floor))
-        # raw/saturation norms
-        m_align_raw_norm = float(np.linalg.norm(m_align_raw))
-        m_damp_raw_norm = float(np.linalg.norm(m_damp_raw))
-        sv.register_value("m_align_raw_norm", m_align_raw_norm)
-        sv.register_value("m_damp_raw_norm",  m_damp_raw_norm)
-        denom_a = gamma * self.m_max + 1e-12
-        denom_d = (1.0 - gamma) * self.m_max + 1e-12
-        sv.register_value("sat_align", m_align_raw_norm /
-                          denom_a if denom_a > 0 else np.nan)
-        sv.register_value("sat_damp",  m_damp_raw_norm /
-                          denom_d if denom_d > 0 else np.nan)
-        # command/tau and correction metric
-        m_cmd_norm = float(np.linalg.norm(commanded_dipole))
-        tau_cmd = np.cross(commanded_dipole, magnetic_field_sb)
-        tau_cmd_norm = float(np.linalg.norm(tau_cmd))
-        err_dir = error_vec / (np.linalg.norm(error_vec) + 1e-20)
-        corr_metric = float(-np.dot(tau_cmd, err_dir))  # >0 = correcting
-        sv.register_value("m_cmd_norm", m_cmd_norm)
-        sv.register_value("tau_cmd_norm", tau_cmd_norm)
-        sv.register_value("corr_metric", corr_metric)
+        # print(f"angle_deg_all: {angle_deg_all}, m_align: {m_align}, m_damp: {m_damp}")
+        # print(f"commanded_dipole: {commanded_dipole}")
+        # print(f"m_max: {self.m_max}")
+        # print(f"angular_acceleration_rad_s2: {angular_acceleration_rad_s2}, angular_velocity_rad_s: {angular_velocity_rad_s}")
+        # print("-----")
         # -------------------------------------------------------------------------
         return angular_acceleration_rad_s2
 

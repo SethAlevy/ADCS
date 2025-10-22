@@ -4,8 +4,6 @@ import skyfield.api as skyfield
 from templates.satellite_template import Satellite
 
 
-
-
 def time_julian_date(satellite: Satellite) -> skyfield.Time:
     """
     Convert the current epoch to Julian Date. Current date is the epoch
@@ -47,21 +45,33 @@ def basic_state_vector(satellite: Satellite) -> None:
     euler_angles = satellite.euler_angles
     angular_velocity = satellite.angular_velocity
 
-    satellite._state_vector.register_vector("position", position, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("velocity", velocity, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "position", position, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "velocity", velocity, labels=['x', 'y', 'z'])
     satellite._state_vector.register_value("latitude", satellite.latitude)
     satellite._state_vector.register_value("longitude", satellite.longitude)
     satellite._state_vector.register_value("altitude", satellite.altitude)
-    satellite._state_vector.register_vector("euler_angles", euler_angles, labels=['x1', 'y1', 'z1'])
-    satellite._state_vector.register_vector("angular_velocity", angular_velocity, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("magnetic_field_sbf", mag_field_sbf, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("magnetic_field_eci", mag_field_eci, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("sun_vector_sbf", sun_vector_sbf, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("sun_vector_eci", sun_vector_eci, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("torque", satellite.torque, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_vector("angular_acceleration", satellite._angular_acceleration, labels=['x', 'y', 'z'])
-    satellite._state_vector.register_value("pointing_error", satellite.pointing_error_angle)
-    satellite._state_vector.register_vector("quaternion", satellite.quaternion, labels=['x', 'y', 'z', 'w'])
+    satellite._state_vector.register_vector(
+        "euler_angles", euler_angles, labels=['x1', 'y1', 'z1'])
+    satellite._state_vector.register_vector(
+        "angular_velocity", angular_velocity, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "magnetic_field_sbf", mag_field_sbf, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "magnetic_field_eci", mag_field_eci, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "sun_vector_sbf", sun_vector_sbf, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "sun_vector_eci", sun_vector_eci, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "torque", satellite.torque, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_vector(
+        "angular_acceleration", satellite._angular_acceleration, labels=['x', 'y', 'z'])
+    satellite._state_vector.register_value(
+        "pointing_error", satellite.pointing_error_angle)
+    satellite._state_vector.register_vector(
+        "quaternion", satellite.quaternion, labels=['x', 'y', 'z', 'w'])
 
 
 def get_lla(satellite: Satellite) -> tuple:
@@ -155,7 +165,7 @@ def filter_significant_digits(array: np.ndarray, sig_digits: int) -> np.ndarray:
 def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
     """
     Round each element to specified number of decimal places
-    
+
     Args:
         array (np.ndarray): Input numpy array or list
         decimal_places (int): Number of decimal places to keep
@@ -166,22 +176,40 @@ def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
     return np.round(array, decimal_places)
 
 
-def limit_norm(vector: np.ndarray, cap: float) -> np.ndarray:
+def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray:
     """
-    Limit the Euclidean norm of a vector to 'cap' without changing direction.
-    If cap <= 0 or ||v|| <= cap, returns the original vector.
+    Uniformly scale 'vector' so that its L2 norm <= cap.
+    - Returns zeros if cap <= 0 or cap is not finite.
+    - Handles lists/tuples/ndarrays.
+    - Copies output to avoid aliasing the input.
 
     Args:
         vector (np.ndarray): Input vector.
         cap (float): Maximum allowed norm.
+        eps (float, optional): Small value to prevent division by zero. Defaults to 1e-12.
 
     Returns:
         np.ndarray: Vector with limited norm.
     """
-    n = float(np.linalg.norm(vector))
-    if cap <= 0.0 or n <= cap:
-        return vector
-    return vector * (cap / n)
+    v = np.asarray(vector, dtype=float)
+    # scalar -> 1D
+    if v.ndim == 0:
+        v = np.array([float(v)], dtype=float)
+
+    # guard cap
+    try:
+        c = float(cap)
+    except Exception:
+        c = np.nan
+    if not np.isfinite(c) or c <= 0.0:
+        return np.zeros_like(v)
+
+    n = float(np.linalg.norm(v))
+    if not np.isfinite(n) or n <= c:
+        return v.copy()
+
+    scale = c / max(n, eps)
+    return v * scale
 
 
 def calculate_pointing_error(

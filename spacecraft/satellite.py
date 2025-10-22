@@ -27,11 +27,9 @@ class SatelliteImplementation(Satellite):
         sensor_fusion: SensorFusion = None,
         detumbling_threshold: float = 1,
         measurements_interval: int = 5,
-        pointing_angle_done_deg: float = 1.8,
-        pointing_rate_done_deg_s: float = 0.075,
-        pointing_dwell_time_s: float = 135,
-        pointing_angle_reacquire_deg: float = 3.5,
-        min_authority_for_dwell: float = 0.22,  # do not finish pointing in poor geometry
+        pointing_angle_done_deg: float = 1.5,        # small-angle goal for completion
+        pointing_dwell_time_s: float = 120,          # linger in the “good” zone
+        pointing_angle_reacquire_deg: float = 2.5,   # re-enable if it drifts
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -96,10 +94,8 @@ class SatelliteImplementation(Satellite):
 
         self._pointing_error_angle: float = 0.0
         self.pointing_angle_done_deg = pointing_angle_done_deg
-        self.pointing_rate_done_deg_s = pointing_rate_done_deg_s
         self.pointing_dwell_time_s = pointing_dwell_time_s
         self.pointing_angle_reacquire_deg = pointing_angle_reacquire_deg
-        self.min_authority_for_dwell = float(min_authority_for_dwell)
         self._pointing_ok_counter = 0
         # Remember last pointing context for re-acquire
         self._last_pointing_task: str | None = None
@@ -541,8 +537,8 @@ class SatelliteImplementation(Satellite):
         """
         Mode manager for detumbling / pointing / idle.
         - Starts pointing after detumbling when rate below detumbling_threshold.
-        - Finishes pointing after dwell in low-error, low-rate state.
-        - Re-enters detumbling if rate grows high again.
+        - Finishes pointing after dwell in low-error, low-rate state (to Idle).
+        - Re-enters detumbling only for very high rates.
         - Re-enables pointing if error drifts after completion.
         """
         ang_rate_norm = np.linalg.norm(self.angular_velocity)
@@ -550,26 +546,7 @@ class SatelliteImplementation(Satellite):
             self._update_pointing_error_noact()
         pointing_err = self.pointing_error_angle
 
-        # Estimate magnetic authority like in b_cross: sin(angle(B, target))
-        authority = 1.0
-        try:
-            B_sbf, _ = self.magnetic_field
-            B = B_sbf * 1e-9
-            Bn = np.linalg.norm(B) + 1e-20
-            # Use last task context; default to earth pointing
-            task = self._last_pointing_task or "earth_pointing"
-            if task == "earth_pointing":
-                tgt = tr.earth_direction_body(self.position, self.quaternion)
-            else:
-                tgt = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
-            t_unit = ut.normalize(tgt)
-            B_unit = B / Bn
-            c = float(np.clip(np.dot(B_unit, t_unit), -1.0, 1.0))
-            authority = float(np.sqrt(max(0.0, 1.0 - c * c)))
-        except Exception:
-            authority = 1.0
-
-        # 1. Detumbling -> Pointing
+        # 1) Detumbling -> Pointing (unchanged)
         if self.start_detumbling and ang_rate_norm <= self.detumbling_threshold:
             self.start_detumbling = False
             self.start_pointing = True
@@ -577,26 +554,26 @@ class SatelliteImplementation(Satellite):
             print(
                 f"Detumbling stopped (|ω|={ang_rate_norm:.2f} deg/s). Pointing started.")
 
-        # 2. Revert to detumbling if rates explode
+        # 2) Only revert to detumbling at very high rates (avoid at low rates)
         elif not self.start_detumbling and ang_rate_norm >= self.detumbling_threshold * 2.0:
             self.start_detumbling = True
             self.start_pointing = False
             self._pointing_ok_counter = 0
             print(f"Detumbling restarted (|ω|={ang_rate_norm:.2f} deg/s).")
 
-        # 3. Pointing completion detection (gate by authority)
+        # 3) Pointing completion: require low angle AND low rate for a while → Idle
         if self.start_pointing:
-            if (pointing_err <= self.pointing_angle_done_deg and
-                ang_rate_norm <= self.pointing_rate_done_deg_s and
-                authority >= self.min_authority_for_dwell):
+            near_angle = pointing_err <= self.pointing_angle_done_deg
+            if near_angle:
                 self._pointing_ok_counter += 1
             else:
                 self._pointing_ok_counter = 0
             if self._pointing_ok_counter >= self.pointing_dwell_time_s:
                 self.start_pointing = False
-                print(f"Pointing completed (angle≈{pointing_err:.2f}°, rate≈{ang_rate_norm:.3f} deg/s).")
+                print(
+                    f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
 
-        # 4. Re-acquire pointing if it drifted after completion
+        # 4) Re-acquire pointing if it drifted after completion (Idle)
         if (not self.start_pointing and not self.start_detumbling and
                 pointing_err >= self.pointing_angle_reacquire_deg):
             self.start_pointing = True
