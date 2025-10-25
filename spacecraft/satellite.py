@@ -27,9 +27,9 @@ class SatelliteImplementation(Satellite):
         sensor_fusion: SensorFusion = None,
         detumbling_threshold: float = 1,
         measurements_interval: int = 5,
-        pointing_angle_done_deg: float = 1.5,        # small-angle goal for completion
+        pointing_angle_done_deg: float = 2,        # small-angle goal for completion
         pointing_dwell_time_s: float = 120,          # linger in the “good” zone
-        pointing_angle_reacquire_deg: float = 2.5,   # re-enable if it drifts
+        pointing_angle_reacquire_deg: float = 3,   # re-enable if it drifts
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe

@@ -22,8 +22,8 @@ class MagnetorquerImplementation:
             magnetic_field_ref: float = 45000,  # nT
             beta: float = 0.5,
             k_p: float = 0.2,
-            k_c: float = 5e-4,
-            k_cp: float = 1e-2,  # a bit more damping gain
+            k_c: float = 0.00038,
+            k_cp: float = 0.012,  # a bit more damping gain
     ):
         # TODO add bang-bang control
         """
