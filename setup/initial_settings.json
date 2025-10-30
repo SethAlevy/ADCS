@@ -1,59 +1,132 @@
 {
-    "PlanetConst" : [
+    "Simulation" :{
+        "PlanetConst" :
+            {
+                "R" : 6.371e6, 
+                "M" : 5.972e24,
+                "G" : 6.67e-11,
+                "UnitInfo" : "m, kg, m^3/(kg*s^2)"
+            },
+            "Iterations" :
+            {
+                "Start" : 0,
+                "Stop" : 5000,
+                "Step" : 1,
+                "LogInterval" : 100,
+                "UnitInfo" : "s"
+            },
+        "Date" :
         {
-            "R" : 6.371e6, 
-            "M" : 5.972e24,
-            "G" : 6.67e-11,
-            "unitInfo" : "m, kg, m^3/(kg*s^2)"
-        }
-    ],
+                "Now": "False",
+                "Year" : 2025,
+                "Month" : 8,
+                "Day" : 15,
+                "Hour" : 12,
+                "Minute" : 0,
+                "Second" : 0,
+                "UnitInfo" : "year, month, day, hour, minute, second"
+            }
+        },
+    
+    "Satellite" : {
+        "Params" :
+            {
+                "Mass" : 1.2,
+                "Inertia" : [[0.002, 0, 0],
+                        [0, 0.002, 0],
+                        [0, 0, 0.002]],
+                "UnitInfo" : "kg, kg*m^2"
+            },
+        "InitialState" :
+            {
+                "EulerAngles" : [0.0, 0.0, 0.0],
+                "AngularVelocity" : [0.01, 0.01, 0.01],
+                "UnitInfo" : "deg, deg/s"
+            }
+        },
 
-    "SatelliteParams" : [
-        {
-            "mass" : 1.5,
-            "I" : [[0.011, 0, 0], [0, 0.011, 0], [0, 0, 0.011]],
-            "unitInfo" : "kg, kg*m^2"
-        }
+    "Sensors"  : {
+        "OnTime" : 5,
+        "Magnetometer" :
+            {
+                "Noise" : "True",
+                "NoiseMax" : 10,
+                "UnitInfo" : "nT"
+            },
+        "SunSensor" :
+            {
+                "Noise" : "True",
+                "AngularNoise" : 0.2,
+                "UnitInfo" : "deg"
+            },
+        "Gyroscope" :
+            {
+                "Bias" : [0.01, 0.01, 0.01],
+                "ProcessNoise" : [1e-8, 1e-8, 1e-8],
+                "UnitInfo" : "deg/s"
+            },
+        "QUEST" :
+            {
+                "Weights" : [1.0, 1.0],
+                "UnitInfo" : "unitless"
+            },
+        "EKF" :
+            {
+                "AttitudeNoise" : [1e-8, 1e-8, 1e-8],
+                "Covariance" : 0.001,
+                "MeasurementNoise" : 0.01,
+                "UnitInfo" : "deg, unitless, unitless"
+            }
+        },
+    "Actuators" : {
+        "OnTime" : 15, 
+        "Magnetorquer" :
+            {
+                "Coils" : 200,
+                "MaxCurrent": 0.2,
+                "RodArea" : 90,
+                "SafetyFactor": 0.9,
+                "UnitInfo" : "coils, cm^2, A, unitless"
+            }
+        },
 
-    ],
-
-    "InitialState" : [
-        {
-            "eulerAngles" : [0.0, 0.0, 0.0],
-            "angularVelocity" : [0, 0, 0],
-            "unitInfo" : "deg, deg/s"
-        }
-    ],
-
-    "Iterations" : [
-        {
-            "start" : 0,
-            "stop" : 12000,
-            "step" : 1,
-            "unitInfo" : "s"
-        }
-    ],
-
-    "Magnetorquer" : [
-        {
-            "n" : 100,
-            "A" : 2,
-            "maxI": 0.5,
-            "unitInfo" : "coils, cm^2, A"
-        }
-    ],
-
-    "Date" : [
-        {
-            "now": "True",
-            "year" : 2023,
-            "month" : 10,
-            "day" : 1,
-            "hour" : 0,
-            "minute" : 0,
-            "second" : 0,
-            "unitInfo" : "year, month, day, hour, minute, second"
-        }
-    ]
-
+    "Controls" : {
+        "Bdot" :
+            {
+                "Proportional" : "False",
+                "Modified" : "False",
+                "AdaptVelocity" : "False",
+                "AdaptMagnetic" : "False",
+                "BangBang" : "False",
+                "Gain" : 10000,
+                "ProportionalGain" : 0.2,
+                "AngularVelocityRef" : 4.0,
+                "Alpha" : 1.6,
+                "MagneticFieldRef" : 45000,
+                "Beta" : 0.5,
+                "UnitInfo" : "unitless, unitless, deg/s, unitless, nT, unitless"
+            },
+        "Bcross" :
+            {
+                "Task" : "earth_pointing",
+                "PointingAxis" : [0.0, 0.0, 1.0],
+                "AlignGain" : 1.1e-5,
+                "ProportionalGain" : 1e-3,
+                "AngleRateMax" : -0.15,
+                "UnitInfo" : "unitless"
+            },
+        "SensorFusion":
+            {
+                "Algorithm" : "EKF"
+            },
+        "ModeManagement":
+            {
+                "DetumblingOff" : 1.0,
+                "DetumblingOn" : 2.0,
+                "PointingOff" : 2.0,
+                "PointingOn" : 3.0,
+                "PointingDwellTime" : 90,
+                "UnitInfo" : "deg/s, deg/s, deg, deg, s"
+            }
+    }
 }

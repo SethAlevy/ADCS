@@ -1,9 +1,10 @@
 import numpy as np
 import core.utilities as ut
-import core.transformations as tr
 from scipy.spatial.transform import Rotation as R
 from templates.initial_settings_template import SimulationSetup
 from templates.satellite_template import Satellite
+import numpy as np
+import core.utilities as ut
 
 
 class MagnetorquerImplementation:
@@ -11,81 +12,69 @@ class MagnetorquerImplementation:
     Abstract class for magnetorquer parameters.
     """
 
-    def __init__(
-            self,
-            setup: SimulationSetup,
-            satellite: Satellite,
-            safety_factor: float = 0.95,
-            k: float = 8000,
-            angular_velocity_ref: float = 4,  # deg/s
-            alpha: float = 1.6,
-            magnetic_field_ref: float = 45000,  # nT
-            beta: float = 0.5,
-            k_p: float = 0.2,
-            k_c: float = 0.00038,
-            k_cp: float = 0.012,  # a bit more damping gain
-    ):
+    def __init__(self, setup: SimulationSetup, satellite: Satellite):
         # TODO add bang-bang control
         """
         Initialize the magnetorquer with the satellite and setup parameters.
 
         Args:
-            setup (SimulationSetup): The simulation setup object.
+            setup (SimulationSetup): The simulation setup object. Contains magnetorquer
+            parameters as well as detumbling settings.
             satellite (Satellite): The satellite object.
             safety_factor (float): A factor to limit the current in the
                 magnetorquer to a safe value.
-            k (float): The gain factor for the b-dot control law. Applied in the
-                standard B-dot control law and is the base for adaptive versions.
-            angular_velocity_ref (float): Reference angular velocity for the
-                adaptive B-dot control law in deg/s. Is the assumed value when the
-                algorithm should switch from fast detumbling to more control.
-            alpha (float): Exponent for the angular velocity adaptation.
-            magnetic_field_ref (float): Reference magnetic field for the
-                adaptive B-dot control law in nT. Is the assumed somewhere
-                about the average magnetic field on the low Earth orbit.
-            beta (float): Exponent for the magnetic field adaptation.
-            k_p (float): Proportional gain for the B-dot control law. Determines
-                how much the magnetic dipole moment is adjusted based on the
-                angular velocity.
-            k_c (float): Control gain for the B-cross control law.
         """
         self._setup = setup
         self._satellite = satellite
+        self._prev_angle_deg = None
+        self._prev_time_s = None
+        # tunables (fallback defaults if missing in JSON)
+        self._angle_rate_max = getattr(setup, "bcross_angle_rate_max", -0.12)   # deg/s
+        self._ramp_seconds = getattr(setup, "bcross_ramp_seconds", 300.0)   # s
+        self._alpha_cap_deg = getattr(
+            setup, "bcross_alpha_cap_deg_s2", 0.008)  # deg/s^2
 
-        self.no_of_coils = self._setup.magnetorquer_params[0]
-        self.coil_area = self._setup.magnetorquer_params[1]
+        # Command shaping (defaults if not in setup)
+        self._m_filt = np.zeros(3)
+        self._prev_m = np.zeros(3)
+        self._m_tau = getattr(setup, "m_filter_tau", 30.0)   # s, low-pass time constant
+        self._m_slew = getattr(setup, "m_slew_limit", 0.02)  # A·m^2 per s (vector slew)
+
+        self.no_of_coils = self._setup.magnetorquer_params["n_coils"]
+        self.coil_area = self._setup.magnetorquer_params["coil_area"]
         self.coil_area = self.coil_area * 1e-4  # Convert cm^2 to m^2
-        self.max_current = self._setup.magnetorquer_params[2]
+        self.max_current = self._setup.magnetorquer_params["max_current"]
+        self.safety_factor = setup.magnetorquer_params["safety_factor"]
+
         self.inertia = satellite.inertia_matrix
         self.inertia_inv = np.linalg.inv(self.inertia)
         self.mass = satellite.mass
-        self.safety_factor = safety_factor
-        # Max achievable dipole (A·m^2)
-        self.m_max = self.no_of_coils * self.coil_area * self.max_current * self.safety_factor
 
         self.magnetic_field_prev = satellite.magnetic_field[0].copy() * 1e-9  # nT to T
         # Use None for robust first-run handling in the derivative filter
         self.db_dt_prev = None
 
         # B-dot parameters
-        self.k = k
+        self.k = setup.b_dot_parameters["gain"]
 
         # B-dot adapted to angular velocity parameters
+        angular_velocity_ref = setup.b_dot_parameters["angular_velocity_ref"]
         self.angular_velocity_ref = ut.degrees_to_rad(angular_velocity_ref)
-        self.alpha = alpha
+        self.alpha = setup.b_dot_parameters["alpha"]
 
         # B-dot adapted to magnetic field parameters
+        magnetic_field_ref = setup.b_dot_parameters["magnetic_field_ref"]
         self.adapt_magnetic_ref = magnetic_field_ref * 1e-9  # nT to T
-        self.beta = beta
+        self.beta = setup.b_dot_parameters["beta"]
 
         # B-dot with proportional term
-        self.k_p = k_p
+        self.k_p = setup.b_dot_parameters["proportional_gain"]
 
         # B-cross parameters
-        self.k_c = k_c
+        self.k_c = setup.b_cross_parameters["align_gain"]
 
         # B-cross with proportional damping
-        self.k_cp = k_cp
+        self.k_cp = setup.b_cross_parameters["proportional_gain"]
 
     def b_dot(
         self,
@@ -113,7 +102,7 @@ class MagnetorquerImplementation:
             adapt_magnetic (bool): Whether to adapt the gain based on the magnetic
                 field strength.
             adapt_angular (bool): Whether to adapt the gain based on the angular
-                velocity.
+                velocity to include damping.
             proportional (bool): Whether to include a proportional term based on
                 the angular velocity.
             modified (bool): Whether to use the modified B-dot control law that
@@ -205,20 +194,19 @@ class MagnetorquerImplementation:
         Returns:
             np.ndarray: The saturated current per axis in A.
         """
-        # Dipole to current
-        n_a = float(self.no_of_coils * self.coil_area)
-        current_cmd = np.asarray(magnetic_dipole_moment, dtype=float) / n_a
+        # vector saturation that preserves direction
+        m_cmd = np.asarray(magnetic_dipole_moment, dtype=float)
+        m_max = float(self.no_of_coils * self.coil_area *
+                      self.max_current * self.safety_factor)
+        norm = np.linalg.norm(m_cmd)
+        if norm > m_max and norm > 0:
+            m_cmd = m_cmd * (m_max / norm)
 
-        # Per-axis limits (support scalar or 3-vector), apply safety factor
-        current_max = np.asarray(self.max_current, dtype=float)
-        if current_max.size == 1:
-            current_max = np.full(3, float(current_max))
-        current_max = np.abs(current_max) * float(self.safety_factor)
-
-        # One scale for all axes to preserve direction
-        denom = np.maximum(np.abs(current_cmd), 1e-12)
-        scale = float(min(1.0, np.min(current_max / denom)))
-        return np.clip(current_cmd * scale, -current_max, current_max)
+        # map dipole to coil currents and clamp per-axis as a final safety
+        i_cmd = m_cmd / (self.no_of_coils * self.coil_area)
+        i_lim = self.max_current * self.safety_factor
+        i_cmd = np.clip(i_cmd, -i_lim, i_lim)
+        return i_cmd
 
     def filtered_derivative(
         self,
@@ -256,49 +244,83 @@ class MagnetorquerImplementation:
         target_dir_body: np.ndarray,
     ) -> np.ndarray:
         """
-        B-cross pointing control (nadir). Generates angular acceleration (rad/s^2).
-        Single switching threshold at 10 deg.
+        B-cross pointing control (nadir). Generates angular acceleration (rad/s^2)
+        based in the error angle. The method combines alignment and damping
+        torques to achieve stable pointing.
+
+        Args:
+            magnetic_field_sbf (np.ndarray): The magnetic field vector in the
+                spacecraft body frame in nT.
+            align_axis (np.ndarray | list): The axis in the body frame to be aligned
+                with the target direction. Specified inside the initial settings json
+                file.
+            target_dir_body (np.ndarray): The target direction vector in the body frame.
+                Calculated based on the specified mode ("earth_pointing" or 
+                "sun_pointing").
         """
 
         magnetic_field_sb = magnetic_field_sbf * 1e-9  # nT to T
         align_axis = np.asarray(align_axis, dtype=float)
-        align_axis = align_axis / (np.linalg.norm(align_axis) + 1e-20)
+        align_axis = ut.normalize(align_axis)
         target_dir_body = ut.normalize(target_dir_body)
 
         # Geometric error e = a × t
         error_vec = np.cross(align_axis, target_dir_body)
 
+        # Angle for info
+        cos_at = float(np.clip(np.dot(align_axis, target_dir_body), -1.0, 1.0))
+        angle_deg_all = ut.rad_to_degrees(float(np.arccos(cos_at)))
+
         # Rates and base gains
         angular_velocity_rad_s = ut.degrees_to_rad(self._satellite.angular_velocity)
-        gain_align = self.k_c * self.m_max if self.k_c <= 1.0 else self.k_c
-        gain_damp = self.k_cp * self.m_max if self.k_cp <= 1.0 else self.k_cp
 
+        # time and dt
+        t_s = float(self._satellite.iteration)
+
+        # 1) longer align ramp
+        ramp = min(1.0, max(0.0, t_s / max(self._ramp_seconds, 1e-3)))
+        gain_align = self.k_c * ramp
+        gain_damp = self.k_cp
         B2 = float(np.dot(magnetic_field_sb, magnetic_field_sb))
-        if B2 <= 0.0:
-            commanded_dipole = np.zeros(3)
+
+        # compute raw dipoles
+        if B2 > 0.0:
+            m_align = -gain_align * np.cross(magnetic_field_sb, error_vec) / B2
+            m_damp = -gain_damp * \
+                    np.cross(magnetic_field_sb, angular_velocity_rad_s) / B2
         else:
+            m_align = np.zeros(3)
+            m_damp = np.zeros(3)
 
-            # Classic B-cross (dipole space)
-            m_align_raw = -gain_align * \
-                np.cross(magnetic_field_sb, error_vec) / B2
-            m_damp_raw = -gain_damp * \
-                np.cross(magnetic_field_sb, angular_velocity_rad_s) / B2
+        # 2) dynamic approach-rate gate on ALIGN only when it would add energy
+        dtheta_dt = 0.0 if self._prev_angle_deg is None else (angle_deg_all - self._prev_angle_deg)
+        if dtheta_dt < self._angle_rate_max and dtheta_dt < 0.0:
+            if angle_deg_all >= 30.0:
+                m_align = np.zeros(3)
 
-            m_align = ut.limit_norm(m_align_raw, self.m_max)
-            m_damp = ut.limit_norm(m_damp_raw, self.m_max)
-            commanded_dipole = m_align + m_damp
+        if angle_deg_all < 5.0:
+            m_damp = m_damp * np.sqrt(5.0 / angle_deg_all)
 
-        # Actuation and resulting angular acceleration
+        commanded_dipole = m_align + m_damp
+
+        # 3) vector angular-acceleration cap (preserves direction)
+        commanded_dipole, alpha_scale = self.limit_by_alpha(
+            commanded_dipole, magnetic_field_sb, alpha_max_deg=self._alpha_cap_deg
+        )
+
+        # actuate
         current_per_axis = self.apply_torquer_with_saturation(commanded_dipole)
         angular_acceleration_rad_s2 = self.current_to_angular_acceleration(
-            current_per_axis, magnetic_field_sb
-        )
-        # print(f"angle_deg_all: {angle_deg_all}, m_align: {m_align}, m_damp: {m_damp}")
-        # print(f"commanded_dipole: {commanded_dipole}")
-        # print(f"m_max: {self.m_max}")
-        # print(f"angular_acceleration_rad_s2: {angular_acceleration_rad_s2}, angular_velocity_rad_s: {angular_velocity_rad_s}")
-        # print("-----")
-        # -------------------------------------------------------------------------
+            current_per_axis, magnetic_field_sb)
+
+        # history + brief log
+        self._prev_angle_deg = angle_deg_all
+        self._prev_time_s = t_s
+        if (self._satellite.iteration % 25) == 0:
+            print(f" B-cross: angle={angle_deg_all} deg"
+                  f" align dipole ={m_align} damp dipole ={m_damp:}")
+            print(
+                f"   approach_gate: dθ/dt={dtheta_dt:.3f}  ramp={ramp:.2f}")
         return angular_acceleration_rad_s2
 
     def get_pointing_error_angle(self, q: np.ndarray) -> float:

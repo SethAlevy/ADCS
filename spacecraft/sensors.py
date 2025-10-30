@@ -6,30 +6,29 @@ from scipy.linalg import eigh
 import core.transformations as tr
 import core.utilities as ut
 from templates.satellite_template import Satellite
+from templates.initial_settings_template import SimulationSetup
 from scipy.spatial.transform import Rotation as R
 
 
 class MagnetometerImplementation:
     def __init__(
         self,
-        noise: bool = False,
-        noise_max: float = 10.0,
+        setup: SimulationSetup,
     ):
         """
         Initialize the Magnetometer class. It is responsible for calculating the
         Earth's magnetic field vector at a given satellite position and time using the
         International Geomagnetic Reference Field (IGRF) model. The measurement
         is simulated in the X, Y, Z axes by transforming it to the Satellite Body
-        Frame (SBF) and optionally adding noise.
+        Frame (SBF) and optionally adding noise. Noise parameters are specified in the
+        initial settings json file.
 
         Args:
-            noise (bool, optional): If True, adds noise to the magnetic field vector.
-                Defaults to False.
-            noise_max (float, optional): Maximum noise level to apply in nT. 
-                Defaults to 10.0.
+            setup (SimulationSetup): The simulation setup containing the magnetometer
+                noise parameters.
         """
-        self.noise = noise
-        self.noise_max = noise_max
+        self.noise = setup.magnetometer["noise"]
+        self.noise_max = setup.magnetometer["noise_max"]
 
     def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
         """
@@ -57,7 +56,8 @@ class MagnetometerImplementation:
         dt = julian_date.utc_datetime()
         start = datetime.datetime(dt.year, 1, 1, tzinfo=dt.tzinfo)
         end = datetime.datetime(dt.year + 1, 1, 1, tzinfo=dt.tzinfo)
-        decimal_year = dt.year + (dt - start).total_seconds() / (end - start).total_seconds()
+        decimal_year = dt.year + (dt - start).total_seconds() \
+            / (end - start).total_seconds()
 
         # IGRF returns NED components in nT
         _, _, _, b_n, b_e, b_d, _ = pyIGRF.igrf_value(lat, lon, alt_km, decimal_year)
@@ -75,8 +75,8 @@ class MagnetometerImplementation:
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
         Args:
-            satellite (Satellite): The satellite object containing the TLE data and current
-                status.
+            satellite (Satellite): The satellite object containing the TLE data and
+            current status.
             julian_date (skyfield.Time): Julian date for which the magnetic field vector
                 is to be computed.
 
@@ -109,8 +109,7 @@ class MagnetometerImplementation:
 class SunsensorImplementation:
     def __init__(
         self,
-        noise: bool = False,
-        angular_noise_max: float = 0.2,
+        setup: SimulationSetup,
     ):
         """
         Initialize the Sunsensor class. It is responsible for calculating the
@@ -120,13 +119,11 @@ class SunsensorImplementation:
         sunsensor is assumed a bit less accurate than the magnetometer.
 
         Args:
-            noise (bool, optional): If True, adds noise to the Sun vector.
-                Defaults to False.
-            angular_noise_max (float, optional): Maximum angular noise to apply in
-                degrees. Defaults to 0.2.
+            setup (SimulationSetup): The simulation setup containing the sunsensor
+                noise parameters.
         """
-        self.noise = noise
-        self.angular_noise_max = angular_noise_max
+        self.noise = setup.sunsensor["noise"]
+        self.angular_noise_max = setup.sunsensor["angular_noise"]
 
         eph = skyfield.load('de421.bsp')  # or 'de440s.bsp' if you want higher precision
         self.sun = eph['sun']
@@ -134,19 +131,18 @@ class SunsensorImplementation:
 
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
         """
-        Compute Sun's position in ECI (ICRF) using Skyfield as seen from Earth.
+        Compute Sun's position in ICRF using Skyfield as seen from Earth (ECI).
 
         Args:
             julian_date (skyfield.Time): Julian date for which to compute the Sun's
                 position.
 
         Returns:
-            numpy.ndarray: [x, y, z] in kilometers in ECI (ICRF) frame
+            numpy.ndarray: [x, y, z] in kilometers in ICRF (ECI) frame
         """
 
-        # Get Sun position relative to Earth in ICRF (equiv. to ECI)
+        # Get Sun position relative to Earth in ICRF (here can be treated as ECI)
         sun_position_eci = self.earth.at(julian_date).observe(self.sun).position.km
-
         return sun_position_eci
 
     def simulate_sunsensor(
@@ -179,21 +175,15 @@ class SunsensorImplementation:
                 -self.angular_noise_max / 2, self.angular_noise_max / 2, 1
             )
             sun_sbf = tr.vector_angular_noise(sun_sbf, angular_noise[0])
-
         return sun_sbf, sun_eci
 
 
 class SensorFusionImplementation():
     def __init__(
             self,
+            setup: SimulationSetup,
             algorithm: list[str],
             init_quaternion: np.ndarray,
-            weights: np.ndarray = np.ones(2),
-            gyro_bias: np.ndarray = np.zeros(3),
-            gyro_process_noise: np.ndarray = np.array([1e-10, 1e-10, 1e-10]),
-            attitude_noise: np.ndarray = np.array([1e-8, 1e-8, 1e-8]),
-            covariance: np.ndarray = np.eye(6) * 0.001,
-            measurement_noise: np.ndarray = np.eye(3) * 0.1
     ):
         """
         Initialize the SensorFusion class. Sensor fusion combines data that comes
@@ -203,46 +193,37 @@ class SensorFusionImplementation():
         accuracy) also estimations about noise bias can be passed while initializing.
 
         Args:
+            setup (SimulationSetup): The simulation setup containing the sensor fusion
+                parameters such as weights, gyro bias, noise, and covariance.
             algorithm (str): List of algorithms to initialize for the sensor fusion.
                 Supported algorithms: 'triad', 'quest', 'ekf'.
             init_quaternion (np.ndarray): Initial quaternion [x, y, z, w] for the
                 attitude.
-            weights (np.ndarray, optional): Weights for the QUEST algorithm.
-                Defaults to np.ones(3).
-            gyro_bias (np.ndarray, optional): Initial gyroscope bias [x, y, z] for
-                the EKF algorithm. Defaults to np.zeros(3) assuming ideal conditions.
-            gyro_process_noise (np.ndarray, optional): Process noise for the gyroscope
-                represents the uncertainty in how the gyroscope bias evolves over time.
-                Defaults to np.array([1e-10, 1e-10, 1e-10]) assuming very small noise.
-            attitude_noise (np.ndarray, optional): Noise in the attitude estimation
-                includes small random perturbations in rotation for the EKF algorithm.
-                Defaults to np.array([1e-8, 1e-8, 1e-8]) assuming uniform, small noise.
-            covariance (np.ndarray, optional): Initial covariance matrix for the EKF
-                algorithm. Describes the uncertainty and corelation between the
-                state variables. Small values indicate high confidence, while larger
-                values indicate a higher uncertainty. Defaults to np.eye(6) * 0.001.
-            measurement_noise (np.ndarray, optional): Measurement noise for the EKF
-                algorithm. Defaults to np.eye(3) * 0.1.
+
         """
         self._data_dict = {alg: {} for alg in algorithm}
         for alg in algorithm:
             self._data_dict[alg][0] = init_quaternion
 
         if 'quest' in algorithm:
-            self.weights = weights
+            self.weights = setup.quest["weights"]
 
         if 'ekf' in algorithm:
-            self.gyro_bias = gyro_bias
-            self.gyro_process_noise = gyro_process_noise
-            self.attitude_noise = attitude_noise
-            self.covariance = covariance
+            self.gyro_bias = setup.gyroscope["bias"]
+            self.gyro_process_noise = setup.gyroscope["process_noise"]
+            self.attitude_noise = setup.ekf["attitude_noise"]
+            self.covariance = np.eye(6) * setup.ekf["covariance"]
 
             self.process_noise = np.diag(
-                np.concatenate([attitude_noise, gyro_process_noise])
+                np.concatenate([self.attitude_noise, self.gyro_process_noise])
             )
-            self.measurement_noise = measurement_noise
+            self.measurement_noise = np.eye(3) * setup.ekf["measurement_noise"]
 
-    def _align_quaternion_sign(self, algorithm: str, quaternion: np.ndarray) -> np.ndarray:
+    def _align_quaternion_sign(
+            self, 
+            algorithm: str,
+            quaternion: np.ndarray
+    ) -> np.ndarray:
         """
         Flip quaternion sign if needed to keep continuity with the last saved one.
 
@@ -261,10 +242,8 @@ class SensorFusionImplementation():
 
     def triad(
             self,
-            v1_i: np.ndarray,
-            v2_i: np.ndarray,
-            v1_b: np.ndarray,
-            v2_b: np.ndarray
+            v_b_list: list[np.ndarray],
+            v_i_list: list[np.ndarray]
     ) -> np.ndarray:
         """
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
@@ -279,24 +258,22 @@ class SensorFusionImplementation():
         https://www.aero.iitb.ac.in/satelliteWiki/index.php/Triad_Algorithm
 
         Args:
-            v1_i (np.ndarray): First vector in inertial frame.
-            v2_i (np.ndarray): Second vector in inertial frame.
-            v1_b (np.ndarray): First vector in body frame.
-            v2_b (np.ndarray): Second vector in body frame.
+            v_b_list (list of np.ndarray): Body frame vectors.
+            v_i_list (list of np.ndarray): Inertial frame vectors.
 
         Returns:
             np.ndarray: quaternion representing the rotation from inertial to body
                 frame.
         """
-        v1_i = ut.normalize(v1_i)
-        v2_i = ut.normalize(v2_i)
+        v1_i = ut.normalize(v_i_list[0])
+        v2_i = ut.normalize(v_i_list[1])
 
         # Build TRIAD in inertial frame
         R_i = self.build_triad(v1_i, v2_i)
 
-        v1_b = ut.normalize(v1_b)
-        v2_b = ut.normalize(v2_b)
-        
+        v1_b = ut.normalize(v_b_list[0])
+        v2_b = ut.normalize(v_b_list[1])
+
         # Build TRIAD in body frame
         R_b = self.build_triad(v1_b, v2_b)
 
@@ -338,7 +315,7 @@ class SensorFusionImplementation():
         """
         QUEST (QUaternion ESTimator) algorithm for optimal attitude estimation of at
         least two sensors. The algorithm solves the Wahba problem by finding the
-        a solution (rotation matrix) that minimizes the error between a set of
+        solution (rotation matrix) that minimizes the error between a set of
         weighted vectors in the body frame and their corresponding vectors in the
         inertial frame. It can take more measurements than TRIAD, and it is more
         robust to noise and outliers giving a more accurate estimate.
@@ -348,8 +325,8 @@ class SensorFusionImplementation():
         https://en.wikipedia.org/wiki/Wahba%27s_problem
 
         Args:
-            v_b_list (list of np.ndarray): Body frame unit vectors.
-            v_i_list (list of np.ndarray): Inertial frame unit vectors.
+            v_b_list (list of np.ndarray): Body frame vectors.
+            v_i_list (list of np.ndarray): Inertial frame vectors.
 
         Returns:
             np.ndarray: Quaternion [x, y, z, w] estimating attitude (ECI to body).
@@ -400,11 +377,11 @@ class SensorFusionImplementation():
         Extended Kalman Filter (EKF) for attitude estimation based on
         gyroscope measurements and at least two vector measurements. It is a recursive
         algorithm (updates over time) that combines the gyroscope data (angular
-        velocity) with the vector measurements (magnetic field and sun vector). The algorithm consists of two steps:
-        prediction and update. The prediction is based on angular velocity, while the
-        update incorporates the vector measurements. Compared to QUEST, EKF
-        can handle noisy measurements and biases giving a comprehensive and
-        accurate estimate.
+        velocity) with the vector measurements (magnetic field and sun vector). The
+        algorithm consists of two steps: prediction and update. The prediction is based
+        on angular velocity, while the update incorporates the vector measurements.
+        Compared to QUEST, EKF can handle noisy measurements and biases giving a
+        comprehensive and accurate estimate.
 
         Useful links:
         https://medium.com/@sasha_przybylski/the-math-behind-extended-kalman-filtering-0df981a87453
@@ -464,7 +441,8 @@ class SensorFusionImplementation():
         F[0:3, 3:6] = -np.eye(3) * timestep
 
         # Propagate covariance
-        self.covariance = np.matmul(F, np.matmul(self.covariance, F.T)) + self.process_noise
+        self.covariance = np.matmul(F, np.matmul(self.covariance, F.T)) \
+            + self.process_noise
         return quaternion
 
     def update_step(

@@ -1,7 +1,7 @@
-from templates.satellite_template import Satellite
 import numpy as np
 from setup.two_line_element import TwoLineElement
 from spacecraft.actuator import MagnetorquerImplementation
+from templates.satellite_template import Satellite
 from templates.initial_settings_template import SimulationSetup
 from templates.sensors_template import Magnetometer
 from templates.sensors_template import Sunsensor
@@ -10,7 +10,6 @@ import skyfield.api as skyfield
 import core.utilities as ut
 import core.transformations as tr
 from core.state import State
-import pandas as pd
 
 
 class SatelliteImplementation(Satellite):
@@ -25,11 +24,6 @@ class SatelliteImplementation(Satellite):
         magnetometer: Magnetometer = None,
         sunsensor: Sunsensor = None,
         sensor_fusion: SensorFusion = None,
-        detumbling_threshold: float = 1,
-        measurements_interval: int = 5,
-        pointing_angle_done_deg: float = 2,        # small-angle goal for completion
-        pointing_dwell_time_s: float = 120,          # linger in the “good” zone
-        pointing_angle_reacquire_deg: float = 3,   # re-enable if it drifts
     ):
         """
         Initialize the satellite object to easily obtain parameters that describe
@@ -56,50 +50,62 @@ class SatelliteImplementation(Satellite):
             detumbling_threshold (float): The angular velocity magnitude above which
                 detumbling is applied. Defaults to 3.0 degrees/s.
         """
-
-        # TODO add measurement and actuation periods
+        # Use the initial parameters from setup to set orientation and rotations
         self.setup = setup
         self._angular_velocity = self.setup.angular_velocity
         self._euler_angles = self.setup.euler_angles
         self._iteration = self.setup.iterations_info["start"]
+
+        # Initialize torque and acceleration as zeros
+        self._torque = np.zeros(3)
+        self._angular_acceleration = np.zeros(3)
 
         # quaternions are a very useful way to represent rotations, use the initial
         # Euler angles to calculate the initial quaternion
         self._quaternion = tr.euler_xyz_to_quaternion(self._euler_angles)
         self._quaternion = self._quaternion / np.linalg.norm(self._quaternion)
 
+        # initialize the satellite model using skyfield library with SGP4 and tle
         self._two_line_element = tle
-
-        # initialize the satellite model using skyfield library
         self._satellite_model = skyfield.EarthSatellite(
-            self.two_line_element.line_1, self.two_line_element.line_2
+            self._two_line_element.line_1, self._two_line_element.line_2
         )
 
+        # Sensor initialization, at this time only magnetometers and sunsensors are
+        # available, but if others would be implemented one may choose to select
+        # various configurations for sensor fusion
         if magnetometer is not None:
             self.magnetometer = magnetometer
         if sunsensor is not None:
             self.sunsensor = sunsensor
-        self.activation_interval = measurements_interval
-
         self.sensor_fusion = sensor_fusion
-        self.magnetorquer = MagnetorquerImplementation(self.setup, self)
-        self._state_vector = State()
+        self.fusion_methods = setup.sensor_fusion_algorithm.capitalize()
 
-        self.detumbling_threshold = detumbling_threshold
+        self.magnetorquer = MagnetorquerImplementation(self.setup, self)
+
+        # in real conditions sensors and actuators should not work at the same time
+        # this values tell how long each of them is active
+        self.sensors_time = True
+        self.actuators_time = False
+        self.actuator_on_time = setup.actuators_on_time
+        self.sensor_on_time = setup.sensors_on_time
+
+        # Set the detumbling/pointing management parameters and initialize the
+        # starting values and mode
+
+        self.detumbling_threshold_on = setup.mode_management['detumbling_on']
+        self.detumbling_threshold_off = setup.mode_management['detumbling_off']
+        self.pointing_error_ang_on = setup.mode_management['pointing_on']
+        self.pointing_error_ang_off = setup.mode_management['pointing_off']
+        self.pointing_dwell_time = setup.mode_management['pointing_dwell']
+
         self.start_detumbling = True
         self.start_pointing = False
-
-        self._torque = np.zeros(3)
-        self._angular_acceleration = np.zeros(3)
-
         self._pointing_error_angle: float = 0.0
-        self.pointing_angle_done_deg = pointing_angle_done_deg
-        self.pointing_dwell_time_s = pointing_dwell_time_s
-        self.pointing_angle_reacquire_deg = pointing_angle_reacquire_deg
         self._pointing_ok_counter = 0
-        # Remember last pointing context for re-acquire
-        self._last_pointing_task: str | None = None
-        self._last_align_axis: np.ndarray | None = None
+
+        # Initialize state vector for data storing
+        self._state_vector = State()
 
     def update_iteration(self, iteration: int) -> None:
         """
@@ -124,14 +130,14 @@ class SatelliteImplementation(Satellite):
         """
         Mass of the satellite in kg.
         """
-        return self.setup.satellite_params[1]
+        return self.setup.satellite_params["mass"]
 
     @property
     def inertia_matrix(self) -> np.ndarray:
         """
         Inertia matrix of the satellite in kg*m^2.
         """
-        return self.setup.satellite_params[0]
+        return self.setup.satellite_params["inertia"]
 
     @property
     def position(self) -> np.ndarray:
@@ -352,6 +358,10 @@ class SatelliteImplementation(Satellite):
 
     @property
     def state_vector(self) -> State:
+        """
+        Get the state vector of the satellite. This object contains all the
+        parameters that are stored during the simulation for later analysis.
+        """
         return self._state_vector
 
     def apply_rotation(self) -> None:
@@ -368,10 +378,8 @@ class SatelliteImplementation(Satellite):
 
     def apply_triad(
             self,
-            v1_i: np.ndarray,
-            v2_i: np.ndarray,
-            v1_b: np.ndarray,
-            v2_b: np.ndarray
+            v_b_list: list[np.ndarray],
+            v_i_list: list[np.ndarray]
     ) -> None:
         """
         Apply the TRIAD algorithm for attitude determination of two sensors.
@@ -381,12 +389,10 @@ class SatelliteImplementation(Satellite):
         computations.
 
         Args:
-            v1_i (np.ndarray): First vector in inertial frame.
-            v2_i (np.ndarray): Second vector in inertial frame.
-            v1_b (np.ndarray): First vector in body frame.
-            v2_b (np.ndarray): Second vector in body frame.
+            v_b_list (list[np.ndarray]): list with vectors in body frame.
+            v_i_list (list[np.ndarray]): list with vectors in inertial frame.
         """
-        self._quaternion = self.sensor_fusion.triad(v1_i, v2_i, v1_b, v2_b)
+        self._quaternion = self.sensor_fusion.triad(v_i_list, v_b_list)
 
     def apply_quest(
             self,
@@ -422,8 +428,11 @@ class SatelliteImplementation(Satellite):
         computations.
 
         Args:
-            v_b_list (list[np.ndarray]): Body-frame unit vectors.
-            v_i_list (list[np.ndarray]): Inertial-frame unit vectors.
+            v_b_list (list[np.ndarray]): list with vectors in body frame.
+            v_i_list (list[np.ndarray]): list with vectors in inertial frame.
+            quaternion_prev (np.ndarray): Previous quaternion estimate.
+            timestemp (float): Time step between the previous and current estimate
+                in seconds. Default is 1.0 second.
         """
         angular_velocity_rad = ut.degrees_to_rad(self.angular_velocity)
         self._quaternion = self.sensor_fusion.ekf(
@@ -434,38 +443,55 @@ class SatelliteImplementation(Satellite):
             quaternion_prev
         )
 
-    def apply_detumbling(
+    def fuse_sensors(
             self,
-            adapt_magnetic: bool = False,
-            adapt_velocity: bool = False,
-            proportional: bool = False,
-            modified: bool = False
+            v_b_list: list[np.ndarray],
+            v_i_list: list[np.ndarray],
+            quaternion_prev: np.ndarray = None,
     ) -> None:
         """
-        Perform detumbling using the specified method. Detumbling is the process
-        of reducing the angular velocity of the satellite to a safe level after
-        deployment. Here the popular B-dot algorithm is implemented using the magnetorquers.
-        Different adaptations of the algorithm can be selected to adjust the behavior.
-        If no selected the basic B-dot is used.
+        Perform the sensor fusion by applying the algorithm selected in
+        initial settings json file.
 
         Args:
-            adapt_magnetic (bool): If True, uses adaptive magnetic field
-                magnitude for detumbling.
-            adapt_velocity (bool): If True, uses adaptive angular velocity
-                magnitude for detumbling.
-            proportional (bool): If True, adds proportional control term to the
-                detumbling algorithm.
-            modified (bool): If True, uses modified B-dot algorithm (based on gyroscopic
-            measurements) for detumbling.
+            v_b_list (list[np.ndarray]): list with vectors in body frame.
+            v_i_list (list[np.ndarray]): list with vectors in inertial frame.
+            quaternion_prev (np.ndarray): Previous quaternion estimate.
+        """
+        self.apply_rotation()
+
+        if self.fusion_methods == "TRIAD":
+            self.apply_triad(v_b_list, v_i_list)
+        elif self.fusion_methods == "QUEST":
+            self.apply_quest(v_b_list, v_i_list)
+        elif self.fusion_methods == "EKF":
+            if quaternion_prev is None:
+                raise ValueError("Previous quaternion must be provided for EKF.")
+            self.apply_ekf(
+                v_b_list,
+                v_i_list,
+                quaternion_prev,
+                self.setup.iterations_info["step"]
+            )
+
+    def apply_detumbling(
+            self,
+    ) -> None:
+        """
+        Detumbling is the process of reducing the angular velocity of the satellite to
+        a safe level after deployment. Here the popular B-dot algorithm is implemented
+        using the magnetorquers. Different adaptations of the algorithm can be selected
+        inside the initial setting json file to adjust the behavior. If no adaptation
+        is selected the basic B-dot is used.
         """
         if self.start_detumbling:
             angular_acceleration = self.magnetorquer.b_dot(
                 self.magnetic_field[0],
-                1,
-                adapt_magnetic,
-                adapt_velocity,
-                proportional,
-                modified
+                self.setup.iterations_info['step'],
+                self.setup.b_dot_mode['adapt_magnetic'],
+                self.setup.b_dot_mode['adapt_velocity'],
+                self.setup.b_dot_mode['proportional'],
+                self.setup.b_dot_mode['modified']
             )
             self._angular_velocity = self.angular_velocity - ut.rad_to_degrees(
                 angular_acceleration
@@ -476,27 +502,24 @@ class SatelliteImplementation(Satellite):
 
     def apply_pointing(
         self,
-        task: str,
-        align_axis: np.ndarray | list,
     ) -> None:
         """
         Apply pointing control to the satellite. This method uses the B-cross
         algorithm to calculate the required torque to align the satellite's
-        body frame with a target vector in the inertial frame.
-
-        Args:
-            task (str): The task which the B-cross should perform. As the algorithm is
-                dedicated to pointing, currently 'earth_pointing' and 'sun_pointing'
-                are supported.
-            align_axis (np.ndarray | list): The axis which should be rotated towards
-                the given target.
-
+        body frame with a target vector in the inertial frame. The target vector
+        can be either the Earth direction or the Sun direction, depending on
+        the selected task in the initial settings.
         """
+        task = self.setup.b_cross_mode['task']
+        align_axis = self.setup.b_cross_mode['axis']
 
         if task == "earth_pointing":
             target_dir_body = tr.earth_direction_body(self.position, self.quaternion)
         elif task == "sun_pointing":
             target_dir_body = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
+        else:
+            raise ValueError(f"Unknown pointing task: {task}. Only 'earth_pointing' "
+                             "and 'sun_pointing' are supported.")
 
         self._pointing_error_angle = ut.calculate_pointing_error(
             target_dir_body,
@@ -515,22 +538,16 @@ class SatelliteImplementation(Satellite):
             self._torque = self.magnetorquer.torque
             self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
 
-        # Remember context for re-acquire when pointing is off
-        self._last_pointing_task = task
-        self._last_align_axis = np.asarray(align_axis, dtype=float)
-
     def _update_pointing_error_noact(self) -> None:
         """Update _pointing_error_angle even when pointing is off."""
-        if self._last_pointing_task is None or self._last_align_axis is None:
-            return
-        if self._last_pointing_task == "earth_pointing":
+        if self.setup.b_cross_mode['task'] == "earth_pointing":
             target_dir_body = tr.earth_direction_body(self.position, self.quaternion)
-        elif self._last_pointing_task == "sun_pointing":
+        elif self.setup.b_cross_mode['task'] == "sun_pointing":
             target_dir_body = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
         else:
             return
         self._pointing_error_angle = ut.calculate_pointing_error(
-            target_dir_body, self._last_align_axis
+            target_dir_body, self.setup.b_cross_mode['axis']
         )
 
     def manage_modes(self) -> None:
@@ -541,41 +558,42 @@ class SatelliteImplementation(Satellite):
         - Re-enters detumbling only for very high rates.
         - Re-enables pointing if error drifts after completion.
         """
-        ang_rate_norm = np.linalg.norm(self.angular_velocity)
+        ang_vel_norm = np.linalg.norm(self.angular_velocity)
         if not self.start_pointing:
             self._update_pointing_error_noact()
         pointing_err = self.pointing_error_angle
 
         # 1) Detumbling -> Pointing (unchanged)
-        if self.start_detumbling and ang_rate_norm <= self.detumbling_threshold:
+        if self.start_detumbling and ang_vel_norm <= self.detumbling_threshold_off:
             self.start_detumbling = False
             self.start_pointing = True
             self._pointing_ok_counter = 0
             print(
-                f"Detumbling stopped (|ω|={ang_rate_norm:.2f} deg/s). Pointing started.")
+                f"Detumbling stopped (|ω|={ang_vel_norm:.2f} deg/s). Pointing started."
+            )
 
         # 2) Only revert to detumbling at very high rates (avoid at low rates)
-        elif not self.start_detumbling and ang_rate_norm >= self.detumbling_threshold * 2.0:
+        elif not self.start_detumbling and ang_vel_norm >= self.detumbling_threshold_on:
             self.start_detumbling = True
             self.start_pointing = False
             self._pointing_ok_counter = 0
-            print(f"Detumbling restarted (|ω|={ang_rate_norm:.2f} deg/s).")
+            print(f"Detumbling restarted (|ω|={ang_vel_norm:.2f} deg/s).")
 
         # 3) Pointing completion: require low angle AND low rate for a while → Idle
         if self.start_pointing:
-            near_angle = pointing_err <= self.pointing_angle_done_deg
+            near_angle = pointing_err <= self.pointing_error_ang_off
             if near_angle:
                 self._pointing_ok_counter += 1
             else:
                 self._pointing_ok_counter = 0
-            if self._pointing_ok_counter >= self.pointing_dwell_time_s:
+            if self._pointing_ok_counter >= self.pointing_dwell_time:
                 self.start_pointing = False
                 print(
                     f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
 
         # 4) Re-acquire pointing if it drifted after completion (Idle)
         if (not self.start_pointing and not self.start_detumbling and
-                pointing_err >= self.pointing_angle_reacquire_deg):
+                pointing_err >= self.pointing_error_ang_on):
             self.start_pointing = True
             self._pointing_ok_counter = 0
             print(f"Pointing re-enabled (drift angle={pointing_err:.1f}°).")
