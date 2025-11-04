@@ -10,7 +10,7 @@
             "Iterations" :
             {
                 "Start" : 0,
-                "Stop" : 5000,
+                "Stop" : 1000,
                 "Step" : 1,
                 "LogInterval" : 100,
                 "UnitInfo" : "s"
@@ -61,7 +61,7 @@
             },
         "Gyroscope" :
             {
-                "Bias" : [0.01, 0.01, 0.01],
+                "Bias" : [0.0, 0.0, 0.0],
                 "ProcessNoise" : [1e-8, 1e-8, 1e-8],
                 "UnitInfo" : "deg/s"
             },
@@ -109,10 +109,9 @@
         "Bcross" :
             {
                 "Task" : "earth_pointing",
-                "PointingAxis" : [0.0, 0.0, 1.0],
-                "AlignGain" : 1.1e-5,
-                "ProportionalGain" : 1e-3,
-                "AngleRateMax" : -0.15,
+                "PointingAxis" : [1.0, 1.0, 0.0],
+                "AlignGain" : 9e-7,
+                "ProportionalGain" : 8e-5,
                 "UnitInfo" : "unitless"
             },
         "SensorFusion":
@@ -121,11 +120,11 @@
             },
         "ModeManagement":
             {
-                "DetumblingOff" : 1.0,
-                "DetumblingOn" : 2.0,
-                "PointingOff" : 2.0,
-                "PointingOn" : 3.0,
-                "PointingDwellTime" : 90,
+                "DetumblingOff" : 0.5,
+                "DetumblingOn" : 1.0,
+                "PointingOff" : 10.0,
+                "PointingOn" : 12.0,
+                "PointingDwellTime" : 60,
                 "UnitInfo" : "deg/s, deg/s, deg, deg, s"
             }
     }
