@@ -54,7 +54,7 @@ class SatelliteImplementation(Satellite):
         self.setup = setup
         self._angular_velocity = self.setup.angular_velocity
         self._euler_angles = self.setup.euler_angles
-        self._iteration = self.setup.iterations_info["start"]
+        self._iteration = self.setup.iterations_info["Start"]
 
         # Initialize torque and acceleration as zeros
         self._torque = np.zeros(3)
@@ -71,6 +71,15 @@ class SatelliteImplementation(Satellite):
             self._two_line_element.line_1, self._two_line_element.line_2
         )
 
+        # in real conditions sensors and actuators should not work at the same time
+        # this values tell how long each of them is active
+        self.sensors_time = True
+        self.actuators_time = False
+        self.actuator_on_time = setup.actuators_on_time
+        self.sensor_on_time = setup.sensors_on_time
+        self.actuator_timer = 0
+        self.sensor_timer = 0
+
         # Sensor initialization, at this time only magnetometers and sunsensors are
         # available, but if others would be implemented one may choose to select
         # various configurations for sensor fusion
@@ -83,21 +92,15 @@ class SatelliteImplementation(Satellite):
 
         self.magnetorquer = MagnetorquerImplementation(self.setup, self)
 
-        # in real conditions sensors and actuators should not work at the same time
-        # this values tell how long each of them is active
-        self.sensors_time = True
-        self.actuators_time = False
-        self.actuator_on_time = setup.actuators_on_time
-        self.sensor_on_time = setup.sensors_on_time
 
         # Set the detumbling/pointing management parameters and initialize the
         # starting values and mode
 
-        self.detumbling_threshold_on = setup.mode_management['detumbling_on']
-        self.detumbling_threshold_off = setup.mode_management['detumbling_off']
-        self.pointing_error_ang_on = setup.mode_management['pointing_on']
-        self.pointing_error_ang_off = setup.mode_management['pointing_off']
-        self.pointing_dwell_time = setup.mode_management['pointing_dwell']
+        self.detumbling_threshold_on = setup.mode_management["DetumblingOn"]
+        self.detumbling_threshold_off = setup.mode_management["DetumblingOff"]
+        self.pointing_error_ang_on = setup.mode_management["PointingOn"]
+        self.pointing_error_ang_off = setup.mode_management["PointingOff"]
+        self.pointing_dwell_time = setup.mode_management["PointingDwellTime"]
 
         self.start_detumbling = True
         self.start_pointing = False
@@ -130,14 +133,14 @@ class SatelliteImplementation(Satellite):
         """
         Mass of the satellite in kg.
         """
-        return self.setup.satellite_params["mass"]
+        return self.setup.satellite_params["Mass"]
 
     @property
     def inertia_matrix(self) -> np.ndarray:
         """
         Inertia matrix of the satellite in kg*m^2.
         """
-        return self.setup.satellite_params["inertia"]
+        return self.setup.satellite_params["Inertia"]
 
     @property
     def position(self) -> np.ndarray:
@@ -294,10 +297,22 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
             [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
-        julian_date = ut.time_julian_date(self)
-        mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(self, julian_date)
-        self.magnetometer.last_sbf_measurement = mag_sbf
-        self.magnetometer.last_eci_measurement = mag_eci
+        if self.sensors_time:
+            julian_date = ut.time_julian_date(self)
+            mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(
+                self, julian_date)
+            self.magnetometer.last_sbf_measurement = mag_sbf
+            self.magnetometer.last_eci_measurement = mag_eci
+            return mag_sbf, mag_eci
+        # reuse last measurements when sensors are off
+        mag_sbf = getattr(self.magnetometer, "last_sbf_measurement", None)
+        mag_eci = getattr(self.magnetometer, "last_eci_measurement", None)
+        if mag_sbf is None or mag_eci is None:
+            julian_date = ut.time_julian_date(self)
+            mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(
+                self, julian_date)
+            self.magnetometer.last_sbf_measurement = mag_sbf
+            self.magnetometer.last_eci_measurement = mag_eci
         return mag_sbf, mag_eci
 
     @property
@@ -310,10 +325,19 @@ class SatelliteImplementation(Satellite):
             np.ndarray: Sun vector in the SBF and ECI frames in form of
             [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
         """
-        julian_date = ut.time_julian_date(self)
-        sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
-        self.sunsensor.last_sbf_measurement = sun_sbf
-        self.sunsensor.last_eci_measurement = sun_eci
+        if self.sensors_time:
+            julian_date = ut.time_julian_date(self)
+            sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
+            self.sunsensor.last_sbf_measurement = sun_sbf
+            self.sunsensor.last_eci_measurement = sun_eci
+            return sun_sbf, sun_eci
+        sun_sbf = getattr(self.sunsensor, "last_sbf_measurement", None)
+        sun_eci = getattr(self.sunsensor, "last_eci_measurement", None)
+        if sun_sbf is None or sun_eci is None:
+            julian_date = ut.time_julian_date(self)
+            sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
+            self.sunsensor.last_sbf_measurement = sun_sbf
+            self.sunsensor.last_eci_measurement = sun_eci
         return sun_sbf, sun_eci
 
     @property
@@ -372,14 +396,11 @@ class SatelliteImplementation(Satellite):
         """
         # Update the quaternion based on the angular velocity
         self._quaternion = tr.update_quaternion_by_angular_velocity(
-            self._quaternion,
-            ut.degrees_to_rad(self.angular_velocity)
+            self._quaternion, ut.degrees_to_rad(self.angular_velocity)
         )
 
     def apply_triad(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> None:
         """
         Apply the TRIAD algorithm for attitude determination of two sensors.
@@ -395,9 +416,7 @@ class SatelliteImplementation(Satellite):
         self._quaternion = self.sensor_fusion.triad(v_i_list, v_b_list)
 
     def apply_quest(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> None:
         """
         Apply the QUEST algorithm for attitude determination of at least two
@@ -413,11 +432,11 @@ class SatelliteImplementation(Satellite):
         self._quaternion = self.sensor_fusion.quest(v_b_list, v_i_list)
 
     def apply_ekf(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray],
-            quaternion_prev: np.ndarray,
-            timestemp: float = 1.0
+        self,
+        v_b_list: list[np.ndarray],
+        v_i_list: list[np.ndarray],
+        quaternion_prev: np.ndarray,
+        timestemp: float = 1.0,
     ) -> None:
         """
         Apply the Extended Kalman Filter (EKF) for attitude estimation of at
@@ -436,18 +455,14 @@ class SatelliteImplementation(Satellite):
         """
         angular_velocity_rad = ut.degrees_to_rad(self.angular_velocity)
         self._quaternion = self.sensor_fusion.ekf(
-            v_b_list,
-            v_i_list,
-            angular_velocity_rad,
-            timestemp,
-            quaternion_prev
+            v_b_list, v_i_list, angular_velocity_rad, timestemp, quaternion_prev
         )
 
     def fuse_sensors(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray],
-            quaternion_prev: np.ndarray = None,
+        self,
+        v_b_list: list[np.ndarray],
+        v_i_list: list[np.ndarray],
+        quaternion_prev: np.ndarray = None,
     ) -> None:
         """
         Perform the sensor fusion by applying the algorithm selected in
@@ -468,14 +483,11 @@ class SatelliteImplementation(Satellite):
             if quaternion_prev is None:
                 raise ValueError("Previous quaternion must be provided for EKF.")
             self.apply_ekf(
-                v_b_list,
-                v_i_list,
-                quaternion_prev,
-                self.setup.iterations_info["step"]
+                v_b_list, v_i_list, quaternion_prev, self.setup.iterations_info["Step"]
             )
 
     def apply_detumbling(
-            self,
+        self,
     ) -> None:
         """
         Detumbling is the process of reducing the angular velocity of the satellite to
@@ -484,14 +496,14 @@ class SatelliteImplementation(Satellite):
         inside the initial setting json file to adjust the behavior. If no adaptation
         is selected the basic B-dot is used.
         """
-        if self.start_detumbling:
+        if self.start_detumbling and self.actuator_on_time:
             angular_acceleration = self.magnetorquer.b_dot(
                 self.magnetic_field[0],
-                self.setup.iterations_info['step'],
-                self.setup.b_dot_mode['adapt_magnetic'],
-                self.setup.b_dot_mode['adapt_velocity'],
-                self.setup.b_dot_mode['proportional'],
-                self.setup.b_dot_mode['modified']
+                self.sensor_on_time,
+                self.setup.b_dot_mode["AdaptMagnetic"],
+                self.setup.b_dot_mode["AdaptVelocity"],
+                self.setup.b_dot_mode["Proportional"],
+                self.setup.b_dot_mode["Modified"],
             )
             self._angular_velocity = self.angular_velocity - ut.rad_to_degrees(
                 angular_acceleration
@@ -510,44 +522,44 @@ class SatelliteImplementation(Satellite):
         can be either the Earth direction or the Sun direction, depending on
         the selected task in the initial settings.
         """
-        task = self.setup.b_cross_mode['task']
-        align_axis = self.setup.b_cross_mode['axis']
+        task = self.setup.b_cross_mode["Task"]
+        align_axis = self.setup.b_cross_mode["PointingAxis"]
 
         if task == "earth_pointing":
             target_dir_body = tr.earth_direction_body(self.position, self.quaternion)
         elif task == "sun_pointing":
             target_dir_body = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
         else:
-            raise ValueError(f"Unknown pointing task: {task}. Only 'earth_pointing' "
-                             "and 'sun_pointing' are supported.")
+            raise ValueError(
+                f"Unknown pointing task: {task}. Only 'earth_pointing' "
+                "and 'sun_pointing' are supported."
+            )
 
         self._pointing_error_angle = ut.calculate_pointing_error(
-            target_dir_body,
-            align_axis
+            target_dir_body, align_axis
         )
 
-        if self.start_pointing:
+        if self.start_pointing and self.actuator_on_time:
             mag_sbf, _ = self.magnetic_field
             angular_acceleration = self.magnetorquer.b_cross(
-                mag_sbf,
-                align_axis,
-                target_dir_body
+                mag_sbf, align_axis, target_dir_body
             )
-            self._angular_velocity = self.angular_velocity + \
-                ut.rad_to_degrees(angular_acceleration)
+            self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
+                angular_acceleration
+            )
             self._torque = self.magnetorquer.torque
             self._angular_acceleration = ut.rad_to_degrees(angular_acceleration)
 
     def _update_pointing_error_noact(self) -> None:
         """Update _pointing_error_angle even when pointing is off."""
-        if self.setup.b_cross_mode['task'] == "earth_pointing":
+        if self.setup.b_cross_mode["Task"] == "earth_pointing":
             target_dir_body = tr.earth_direction_body(self.position, self.quaternion)
-        elif self.setup.b_cross_mode['task'] == "sun_pointing":
+        elif self.setup.b_cross_mode["Task"] == "sun_pointing":
             target_dir_body = tr.sun_direction_body(self.sun_vector[1], self.quaternion)
         else:
             return
         self._pointing_error_angle = ut.calculate_pointing_error(
-            target_dir_body, self.setup.b_cross_mode['axis']
+            target_dir_body, self.setup.b_cross_mode["PointingAxis"]
         )
 
     def manage_modes(self) -> None:
@@ -588,12 +600,32 @@ class SatelliteImplementation(Satellite):
                 self._pointing_ok_counter = 0
             if self._pointing_ok_counter >= self.pointing_dwell_time:
                 self.start_pointing = False
-                print(
-                    f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
+                print(f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
 
         # 4) Re-acquire pointing if it drifted after completion (Idle)
-        if (not self.start_pointing and not self.start_detumbling and
-                pointing_err >= self.pointing_error_ang_on):
+        if (
+            not self.start_pointing
+            and not self.start_detumbling
+            and pointing_err >= self.pointing_error_ang_on
+        ):
             self.start_pointing = True
             self._pointing_ok_counter = 0
             print(f"Pointing re-enabled (drift angle={pointing_err:.1f}°).")
+
+    def manage_actuators_sensors_timing(self) -> None:
+        """
+        Manage the timing of actuators and sensors operation.
+        Ensures that actuators and sensors do not operate simultaneously.
+        """
+        if self.sensors_time:
+            self.sensor_timer += self.setup.iterations_info["Step"]
+            if self.sensor_timer >= self.sensor_on_time:
+                self.sensors_time = False
+                self.actuators_time = True
+                self.sensor_timer = 0
+        elif self.actuators_time:
+            self.actuator_timer += self.setup.iterations_info["Step"]
+            if self.actuator_timer >= self.actuator_on_time:
+                self.actuators_time = False
+                self.sensors_time = True
+                self.actuator_timer = 0

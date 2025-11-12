@@ -224,8 +224,8 @@ class SimulationSetup(ABC):
                 adaptive B-dot control law in deg/s. Is the assumed value when the
                 algorithm should switch from fast detumbling to more control.
             float: Exponent for the angular velocity adaptation.
-            int: Reference magnetic field for the adaptive B-dot control law 
-                in nT. Is the assumed somewhere about the average magnetic field on the 
+            int: Reference magnetic field for the adaptive B-dot control law
+                in nT. Is the assumed somewhere about the average magnetic field on the
                 low Earth orbit.
             float: Exponent for the magnetic field adaptation.
 
@@ -251,7 +251,7 @@ class SimulationSetup(ABC):
         B-cross control parameters.
 
         returns:
-            float: align gain that determines how quickly the system aligns with 
+            float: align gain that determines how quickly the system aligns with
                 the target.
             float: proportional gain that determines how much the system will damp
             angular velocity.

@@ -90,9 +90,7 @@ class Sunsensor(ABC):
 
     @abstractmethod
     def simulate_sunsensor(
-            self,
-            satellite: object,
-            julian_date: skyfield.Time
+        self, satellite: object, julian_date: skyfield.Time
     ) -> np.ndarray:
         """
         Simulate the Sun sensor readings. This method computes the Sun vector
@@ -124,11 +122,7 @@ class SensorFusion(ABC):
 
     @abstractmethod
     def triad(
-        self,
-        v1_i: np.ndarray,
-        v2_i: np.ndarray,
-        v1_b: np.ndarray,
-        v2_b: np.ndarray
+        self, v1_i: np.ndarray, v2_i: np.ndarray, v1_b: np.ndarray, v2_b: np.ndarray
     ) -> np.ndarray:
         """
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
@@ -154,9 +148,7 @@ class SensorFusion(ABC):
 
     @abstractmethod
     def quest(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> np.ndarray:
         """
         QUEST (QUaternion ESTimator) algorithm for optimal attitude estimation of at
@@ -181,12 +173,12 @@ class SensorFusion(ABC):
 
     @abstractmethod
     def ekf(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray],
-            angular_velocity: np.ndarray,
-            timestep: float,
-            quaternion: np.ndarray
+        self,
+        v_b_list: list[np.ndarray],
+        v_i_list: list[np.ndarray],
+        angular_velocity: np.ndarray,
+        timestep: float,
+        quaternion: np.ndarray,
     ) -> np.ndarray:
         """
         Extended Kalman Filter (EKF) for attitude estimation based on

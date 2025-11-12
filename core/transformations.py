@@ -4,11 +4,7 @@ from scipy.spatial.transform import Rotation as R
 import skyfield.timelib
 
 
-def enu_to_ecef(
-    enu_vec: np.ndarray,
-    lat_deg: float,
-    lon_deg: float
-) -> np.ndarray:
+def enu_to_ecef(enu_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
     """
     Convert a vector from ENU (East-North-Up) to ECEF (Earth-Centered, Earth-Fixed).
 
@@ -16,7 +12,7 @@ def enu_to_ecef(
         enu_vec (np.ndarray): Vector in ENU frame.
         lat_deg (float): Latitude in degrees.
         lon_deg (float): Longitude in degrees.
-    
+
     Returns:
         np.ndarray: Vector in ECEF frame.
     """
@@ -27,11 +23,15 @@ def enu_to_ecef(
     sλ, cλ = np.sin(lon), np.cos(lon)
 
     # Standard ENU→ECEF rotation (columns are E,N,U expressed in ECEF)
-    rot_enu_to_ecef = R.from_matrix(np.array([
-        [-sλ,         cλ,        0.0],
-        [-sφ * cλ,   -sφ * sλ,   cφ],
-        [cφ * cλ,    cφ * sλ,   sφ],
-    ]))
+    rot_enu_to_ecef = R.from_matrix(
+        np.array(
+            [
+                [-sλ, cλ, 0.0],
+                [-sφ * cλ, -sφ * sλ, cφ],
+                [cφ * cλ, cφ * sλ, sφ],
+            ]
+        )
+    )
     return rot_enu_to_ecef.apply(enu_vec)
 
 
@@ -52,10 +52,7 @@ def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarr
     return enu_to_ecef(enu, lat_deg, lon_deg)
 
 
-def ecef_to_eci(
-    ecef_vec: np.ndarray,
-    time: skyfield.timelib
-) -> np.ndarray:
+def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib) -> np.ndarray:
     """
     Convert a vector from ECEF (Earth-Centered, Earth-Fixed) to ECI
     (Earth-Centered Inertial) frame.
@@ -73,37 +70,6 @@ def ecef_to_eci(
     # ECEF to ECI: rotate forward by GAST about Z axis
     rot = R.from_euler("z", gast_rad, degrees=False)
     return rot.apply(ecef_vec)
-
-
-def euler_xyz_to_quaternion(
-    euler_angles: np.ndarray, degrees: bool = True
-) -> np.ndarray:
-    """
-    Convert Euler angles in X-Y-Z convention to a quaternion.
-
-    Args:
-        euler_angles (np.ndarray): Euler angles [x1, y1, z1] in degrees or radians.
-        degrees (bool): If True, input angles are in degrees. If False, in radians.
-
-    Returns:
-        np.ndarray: Quaternion as [x, y, z, w].
-    """
-    rot = R.from_euler("xyz", euler_angles, degrees=degrees)
-    return rot.as_quat()
-
-
-def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
-    """
-    Convert a quaternion to Euler angles in X-Y-Z convention (degrees).
-
-    Args:
-        quat (np.ndarray): Quaternion in [x, y, z, w] format.
-
-    Returns:
-        np.ndarray: Euler angles [x1, y1, z1] in degrees.
-    """
-    rot = R.from_quat(quat)
-    return rot.as_euler("xyz", degrees=degrees)
 
 
 def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
@@ -143,6 +109,37 @@ def sbf_to_eci(vec_sbf: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     return inv_rot.apply(vec_sbf)
 
 
+def euler_xyz_to_quaternion(
+    euler_angles: np.ndarray, degrees: bool = True
+) -> np.ndarray:
+    """
+    Convert Euler angles in X-Y-Z convention to a quaternion.
+
+    Args:
+        euler_angles (np.ndarray): Euler angles [x1, y1, z1] in degrees or radians.
+        degrees (bool): If True, input angles are in degrees. If False, in radians.
+
+    Returns:
+        np.ndarray: Quaternion as [x, y, z, w].
+    """
+    rot = R.from_euler("xyz", euler_angles, degrees=degrees)
+    return rot.as_quat()
+
+
+def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
+    """
+    Convert a quaternion to Euler angles in X-Y-Z convention (degrees).
+
+    Args:
+        quat (np.ndarray): Quaternion in [x, y, z, w] format.
+
+    Returns:
+        np.ndarray: Euler angles [x1, y1, z1] in degrees.
+    """
+    rot = R.from_quat(quat)
+    return rot.as_euler("xyz", degrees=degrees)
+
+
 def quat_deriv(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
     """
     Compute the quaternion time derivative given angular velocity.
@@ -172,12 +169,14 @@ def quat_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     """
     x1, y1, z1, w1 = q1
     x2, y2, z2, w2 = q2
-    return np.array([
-        w1*x2 + x1*w2 + y1*z2 - z1*y2,
-        w1*y2 - x1*z2 + y1*w2 + z1*x2,
-        w1*z2 + x1*y2 - y1*x2 + z1*w2,
-        w1*w2 - x1*x2 - y1*y2 - z1*z2
-    ])
+    return np.array(
+        [
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        ]
+    )
 
 
 def update_quaternion_by_angular_velocity(
@@ -200,9 +199,7 @@ def update_quaternion_by_angular_velocity(
     return quaternion_new
 
 
-def rotation_matrix_to_quaternion(
-    rotation_matrix: np.ndarray
-) -> np.ndarray:
+def rotation_matrix_to_quaternion(rotation_matrix: np.ndarray) -> np.ndarray:
     """
     Convert a rotation matrix to a quaternion.
 
@@ -234,8 +231,7 @@ def rotate_vector_by_quaternion(
 
 
 def earth_direction_body(
-    position_eci: np.ndarray,
-    quat_sb_from_eci: np.ndarray
+    position_eci: np.ndarray, quat_sb_from_eci: np.ndarray
 ) -> np.ndarray:
     """
     Return unit vector in body frame pointing toward Earth's center (nadir).
@@ -285,8 +281,7 @@ def vector_angular_noise(vec: np.ndarray, angle_deg: float) -> np.ndarray:
 
 
 def sun_direction_body(
-    sun_vector_eci: np.ndarray,
-    quat_sb_from_eci: np.ndarray
+    sun_vector_eci: np.ndarray, quat_sb_from_eci: np.ndarray
 ) -> np.ndarray:
     """
     Return unit vector in body frame pointing toward the Sun.

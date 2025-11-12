@@ -12,14 +12,14 @@ class State:
             # back-fill all previous rows with NaN when a new column is introduced late
             self._cols[name] = [np.nan] * (self._rows - 1)
         return self._cols[name]
-    
+
     def next_row(self) -> None:
         """Start a new row; pre-fill all existing columns with NaN."""
         self._rows += 1
         for col in self._cols.values():
             col.append(np.nan)
 
-    def register_value(self, name: str, value) -> None: 
+    def register_value(self, name: str, value) -> None:
         col = self._ensure_col(name)
         # Ensure this column is aligned with the current row index
         if len(col) < self._rows - 1:
@@ -35,7 +35,7 @@ class State:
             # if someone appended too far, trim to the current row then append
             col[:] = col[: self._rows - 1] + [value]
 
-    def register_vector(self, name, vector, labels=['x', 'y', 'z']) -> None:
+    def register_vector(self, name, vector, labels=["x", "y", "z"]) -> None:
         for i, label in enumerate(labels):
             self.register_value(f"{name}_{label}", vector[i])
 

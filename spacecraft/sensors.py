@@ -27,12 +27,16 @@ class MagnetometerImplementation:
             setup (SimulationSetup): The simulation setup containing the magnetometer
                 noise parameters.
         """
-        self.noise = setup.magnetometer["noise"]
-        self.noise_max = setup.magnetometer["noise_max"]
+        self.noise = setup.magnetometer["Noise"]
+        self.noise_max = setup.magnetometer["NoiseMax"]
+
+        # cache of last measurements (set by simulate_magnetometer)
+        self.last_sbf_measurement = None
+        self.last_eci_measurement = None
 
     def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
         """
-        Get the magnetic field vector at the satellite's position and given time. 
+        Get the magnetic field vector at the satellite's position and given time.
         Magnetic field model is taken from the IGRF via pyIGRF library. Originally it is
         in NED (North-East-Down) frame and in nT (nanoTesla) thus a transformation is
         needed to convert it to ECEF and then to ECI frame.
@@ -42,7 +46,7 @@ class MagnetometerImplementation:
                 current status.
             julian_date (skyfield.Time): Julian date for which the magnetic field vector
                 is to be computed.
-    
+
         Returns:
             np.ndarray: Magnetic field vector in NED frame in nT (nanoTesla).
         """
@@ -56,8 +60,9 @@ class MagnetometerImplementation:
         dt = julian_date.utc_datetime()
         start = datetime.datetime(dt.year, 1, 1, tzinfo=dt.tzinfo)
         end = datetime.datetime(dt.year + 1, 1, 1, tzinfo=dt.tzinfo)
-        decimal_year = dt.year + (dt - start).total_seconds() \
-            / (end - start).total_seconds()
+        decimal_year = (
+            dt.year + (dt - start).total_seconds() / (end - start).total_seconds()
+        )
 
         # IGRF returns NED components in nT
         _, _, _, b_n, b_e, b_d, _ = pyIGRF.igrf_value(lat, lon, alt_km, decimal_year)
@@ -92,16 +97,15 @@ class MagnetometerImplementation:
             mag_field_ned, satellite.latitude, satellite.longitude
         )
         mag_field_eci = tr.ecef_to_eci(mag_field_ecef, julian_date)
-        mag_field_sbf = tr.eci_to_sbf(
-            mag_field_eci,
-            satellite.quaternion
-        )
+        mag_field_sbf = tr.eci_to_sbf(mag_field_eci, satellite.quaternion)
 
         if self.noise:
-            noise_vector = np.random.uniform(
-                -self.noise_max / 2, self.noise_max / 2, 3
-            )
+            noise_vector = np.random.uniform(-self.noise_max / 2, self.noise_max / 2, 3)
             mag_field_sbf += noise_vector
+
+        # update cache
+        self.last_sbf_measurement = mag_field_sbf
+        self.last_eci_measurement = mag_field_eci
 
         return mag_field_sbf, mag_field_eci
 
@@ -122,12 +126,16 @@ class SunsensorImplementation:
             setup (SimulationSetup): The simulation setup containing the sunsensor
                 noise parameters.
         """
-        self.noise = setup.sunsensor["noise"]
-        self.angular_noise_max = setup.sunsensor["angular_noise"]
+        self.noise = setup.sunsensor["Noise"]
+        self.angular_noise_max = setup.sunsensor["AngularNoise"]
 
-        eph = skyfield.load('de421.bsp')  # or 'de440s.bsp' if you want higher precision
-        self.sun = eph['sun']
-        self.earth = eph['earth']
+        eph = skyfield.load("de421.bsp")  # or 'de440s.bsp' if you want higher precision
+        self.sun = eph["sun"]
+        self.earth = eph["earth"]
+
+        # cache of last measurements (set by simulate_sunsensor)
+        self.last_sbf_measurement = None
+        self.last_eci_measurement = None
 
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
         """
@@ -146,9 +154,7 @@ class SunsensorImplementation:
         return sun_position_eci
 
     def simulate_sunsensor(
-            self,
-            satellite: object,
-            julian_date: skyfield.Time
+        self, satellite: object, julian_date: skyfield.Time
     ) -> np.ndarray:
         """
         Simulate the Sun sensor readings. This method computes the Sun vector
@@ -178,12 +184,12 @@ class SunsensorImplementation:
         return sun_sbf, sun_eci
 
 
-class SensorFusionImplementation():
+class SensorFusionImplementation:
     def __init__(
-            self,
-            setup: SimulationSetup,
-            algorithm: list[str],
-            init_quaternion: np.ndarray,
+        self,
+        setup: SimulationSetup,
+        algorithm: list[str],
+        init_quaternion: np.ndarray,
     ):
         """
         Initialize the SensorFusion class. Sensor fusion combines data that comes
@@ -205,24 +211,26 @@ class SensorFusionImplementation():
         for alg in algorithm:
             self._data_dict[alg][0] = init_quaternion
 
-        if 'quest' in algorithm:
-            self.weights = setup.quest["weights"]
+        if "quest" in algorithm:
+            self.weights = setup.quest["Weights"]
 
-        if 'ekf' in algorithm:
-            self.gyro_bias = setup.gyroscope["bias"]
-            self.gyro_process_noise = setup.gyroscope["process_noise"]
-            self.attitude_noise = setup.ekf["attitude_noise"]
-            self.covariance = np.eye(6) * setup.ekf["covariance"]
+        if "ekf" in algorithm:
+            self.gyro_bias = np.deg2rad(np.array(setup.gyroscope["Bias"], dtype=float))
+            self.gyro_process_noise = np.deg2rad(
+                np.array(setup.gyroscope["ProcessNoise"], dtype=float)
+            )
+            self.attitude_noise = np.deg2rad(
+                np.array(setup.ekf["AttitudeNoise"], dtype=float)
+            )
+            self.covariance = np.eye(6) * float(setup.ekf["Covariance"])
 
             self.process_noise = np.diag(
-                np.concatenate([self.attitude_noise, self.gyro_process_noise])
+                np.concatenate([self.attitude_noise**2, self.gyro_process_noise**2])
             )
-            self.measurement_noise = np.eye(3) * setup.ekf["measurement_noise"]
+            self._init_measurement_noise(setup)
 
     def _align_quaternion_sign(
-            self, 
-            algorithm: str,
-            quaternion: np.ndarray
+        self, algorithm: str, quaternion: np.ndarray
     ) -> np.ndarray:
         """
         Flip quaternion sign if needed to keep continuity with the last saved one.
@@ -241,9 +249,7 @@ class SensorFusionImplementation():
         return quaternion
 
     def triad(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> np.ndarray:
         """
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
@@ -308,9 +314,7 @@ class SensorFusionImplementation():
         return R
 
     def quest(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> np.ndarray:
         """
         QUEST (QUaternion ESTimator) algorithm for optimal attitude estimation of at
@@ -342,11 +346,7 @@ class SensorFusionImplementation():
         # create auxiliary matrices
         S = B + B.T
         sigma = np.trace(B)
-        Z = np.array([
-            B[1, 2] - B[2, 1],
-            B[2, 0] - B[0, 2],
-            B[0, 1] - B[1, 0]
-        ])
+        Z = np.array([B[1, 2] - B[2, 1], B[2, 0] - B[0, 2], B[0, 1] - B[1, 0]])
 
         # create the K matrix K = [S - sigma*I      Z  ]
         #                         [Z.T          sigma  ]
@@ -366,12 +366,12 @@ class SensorFusionImplementation():
         return quaternion
 
     def ekf(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray],
-            angular_velocity: np.ndarray,
-            timestep: float,
-            quaternion: np.ndarray
+        self,
+        v_b_list: list[np.ndarray],
+        v_i_list: list[np.ndarray],
+        angular_velocity: np.ndarray,
+        timestep: float,
+        quaternion: np.ndarray,
     ) -> np.ndarray:
         """
         Extended Kalman Filter (EKF) for attitude estimation based on
@@ -385,6 +385,7 @@ class SensorFusionImplementation():
 
         Useful links:
         https://medium.com/@sasha_przybylski/the-math-behind-extended-kalman-filtering-0df981a87453
+        https://automaticaddison.com/extended-kalman-filter-ekf-with-python-code-example/
 
         Args:
             v_b_list (list of np.ndarray): Body frame unit vectors.
@@ -398,18 +399,18 @@ class SensorFusionImplementation():
         quaternion = self.prediction_step(angular_velocity, quaternion, timestep)
 
         # iterate through all vector measurements updating the quaternion
-        for v_b, v_i in zip(v_b_list, v_i_list):
-            quaternion = self.update_step(v_b, v_i, quaternion)
+        noises = self.measurement_noise[: len(v_b_list)]
+        for v_b, v_i, noise in zip(v_b_list, v_i_list, noises):
+            v_b = ut.normalize(v_b)
+            v_i = ut.normalize(v_i)
+            quaternion = self.update_step(v_b, v_i, quaternion, noise)
 
         self.save_to_data_dict("ekf", quaternion)
         quaternion /= np.linalg.norm(quaternion)
         return quaternion
 
     def prediction_step(
-            self,
-            angular_velocity: np.ndarray,
-            quaternion: np.ndarray,
-            timestep: float
+        self, angular_velocity: np.ndarray, quaternion: np.ndarray, timestep: float
     ) -> np.ndarray:
         """
         Predict step of the EKF using gyroscope data. The state (quaternion) is
@@ -441,15 +442,17 @@ class SensorFusionImplementation():
         F[0:3, 3:6] = -np.eye(3) * timestep
 
         # Propagate covariance
-        self.covariance = np.matmul(F, np.matmul(self.covariance, F.T)) \
-            + self.process_noise
+        self.covariance = (
+            np.matmul(F, np.matmul(self.covariance, F.T)) + self.process_noise
+        )
         return quaternion
 
     def update_step(
-            self,
-            measurement_vector: np.ndarray,
-            reference_vector: np.ndarray,
-            quaternion: np.ndarray
+        self,
+        measurement_vector: np.ndarray,
+        reference_vector: np.ndarray,
+        quaternion: np.ndarray,
+        measurement_noise: float,
     ) -> np.ndarray:
         """
         Update step of the EKF using vector measurements. The measurement is
@@ -469,7 +472,8 @@ class SensorFusionImplementation():
         """
         # Predict measurement by rotating reference vector into body frame
         predicted_vector_body = tr.rotate_vector_by_quaternion(
-            reference_vector, quaternion)
+            reference_vector, quaternion
+        )
 
         # Innovation difference between the measurement and predicted vector
         innovation = measurement_vector - predicted_vector_body
@@ -479,9 +483,9 @@ class SensorFusionImplementation():
         H = np.zeros((3, 6))
         H[:, 0:3] = -ut.skew_symmetric(predicted_vector_body)
 
-        # Kalman Gain determines how much to trust new measurements versus
-        # the current prediction
-        S = np.matmul(np.matmul(H, self.covariance), H.T) + self.measurement_noise
+        # per-measurement noise R = σ^2 I
+        Rm = np.eye(3) * (measurement_noise**2)
+        S = np.matmul(np.matmul(H, self.covariance), H.T) + Rm
         K = np.matmul(np.matmul(self.covariance, H.T), np.linalg.inv(S))
 
         # Update state
@@ -507,3 +511,23 @@ class SensorFusionImplementation():
             raise ValueError(f"Algorithm '{algorithm}' not initialized")
         iteration = np.max(list(self._data_dict[algorithm].keys())) + 1
         self._data_dict[algorithm][iteration] = data
+
+    def _init_measurement_noise(self, setup: SimulationSetup) -> None:
+        """
+        Initialize EKF measurement noise standard deviations from sensor settings.
+        magnetometer: component noise (nT) uniform in [-a/2, a/2] → σ = a/√12,
+                      then normalized by |B| reference (dimensionless for unit vector).
+        sunsensor: angular noise (deg) uniform → σ = (deg→rad)/√12.
+        """
+        # Try multiple locations for MagneticFieldRef; fall back to 45000 nT
+        try:
+            b_ref = float(setup.b_dot["magnetic_field_ref"])
+        except Exception:
+            try:
+                b_ref = float(setup.b_dot_parameters["MagneticFieldRef"])
+            except Exception:
+                b_ref = 45000.0
+        sigma_mag = float(setup.magnetometer["NoiseMax"]) / np.sqrt(12.0)
+        sigma_mag = sigma_mag / max(b_ref, 1.0)
+        sigma_sun = np.deg2rad(float(setup.sunsensor["AngularNoise"])) / np.sqrt(12.0)
+        self.measurement_noise = [sigma_mag, sigma_sun]

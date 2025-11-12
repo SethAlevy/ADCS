@@ -10,14 +10,14 @@
             "Iterations" :
             {
                 "Start" : 0,
-                "Stop" : 1000,
+                "Stop" : 10000,
                 "Step" : 1,
                 "LogInterval" : 100,
                 "UnitInfo" : "s"
             },
         "Date" :
         {
-                "Now": "False",
+                "Now": false,
                 "Year" : 2025,
                 "Month" : 8,
                 "Day" : 15,
@@ -40,78 +40,78 @@
         "InitialState" :
             {
                 "EulerAngles" : [0.0, 0.0, 0.0],
-                "AngularVelocity" : [0.01, 0.01, 0.01],
+                "AngularVelocity" : [2.0, -3.0, 4.0],
                 "UnitInfo" : "deg, deg/s"
             }
         },
 
     "Sensors"  : {
-        "OnTime" : 5,
+        "OnTime" : 2,
         "Magnetometer" :
             {
-                "Noise" : "True",
+                "Noise" : true,
                 "NoiseMax" : 10,
                 "UnitInfo" : "nT"
             },
         "SunSensor" :
             {
-                "Noise" : "True",
+                "Noise" : true,
                 "AngularNoise" : 0.2,
                 "UnitInfo" : "deg"
             },
         "Gyroscope" :
             {
-                "Bias" : [0.0, 0.0, 0.0],
-                "ProcessNoise" : [1e-8, 1e-8, 1e-8],
+                "Bias" : [0.02, -0.01, 0.015],
+                "ProcessNoise" : [1e-5, 1e-5, 1e-5],
                 "UnitInfo" : "deg/s"
             },
         "QUEST" :
             {
-                "Weights" : [1.0, 1.0],
+                "Weights" : [0.6, 0.4],
                 "UnitInfo" : "unitless"
             },
         "EKF" :
             {
-                "AttitudeNoise" : [1e-8, 1e-8, 1e-8],
-                "Covariance" : 0.001,
-                "MeasurementNoise" : 0.01,
+                "AttitudeNoise" : [1e-4, 1e-4, 1e-4],
+                "Covariance" : 0.005,
                 "UnitInfo" : "deg, unitless, unitless"
             }
         },
     "Actuators" : {
-        "OnTime" : 15, 
+        "OnTime" : 8, 
         "Magnetorquer" :
             {
                 "Coils" : 200,
                 "MaxCurrent": 0.2,
                 "RodArea" : 90,
                 "SafetyFactor": 0.9,
-                "UnitInfo" : "coils, cm^2, A, unitless"
+                "AlphaCap": 0.5,
+                "UnitInfo" : "coils, cm^2, A, unitless, deg/s2"
             }
         },
 
     "Controls" : {
         "Bdot" :
             {
-                "Proportional" : "False",
-                "Modified" : "False",
-                "AdaptVelocity" : "False",
-                "AdaptMagnetic" : "False",
-                "BangBang" : "False",
-                "Gain" : 10000,
-                "ProportionalGain" : 0.2,
-                "AngularVelocityRef" : 4.0,
-                "Alpha" : 1.6,
+                "Proportional" : false,
+                "Modified" : false,
+                "AdaptVelocity" : false,
+                "AdaptMagnetic" : false,
+                "BangBang" : false,
+                "Gain" : 2000,
+                "ProportionalGain" : 0.05,
+                "AngularVelocityRef" : 2.0,
+                "Alpha" : 1.4,
                 "MagneticFieldRef" : 45000,
-                "Beta" : 0.5,
+                "Beta" : 0.6,
                 "UnitInfo" : "unitless, unitless, deg/s, unitless, nT, unitless"
             },
         "Bcross" :
             {
                 "Task" : "earth_pointing",
-                "PointingAxis" : [1.0, 1.0, 0.0],
-                "AlignGain" : 9e-7,
-                "ProportionalGain" : 8e-5,
+                "PointingAxis" : [1.0, 1.0, 1.0],
+                "AlignGain" : 6e-7,
+                "ProportionalGain" : 2.5e-4,
                 "UnitInfo" : "unitless"
             },
         "SensorFusion":
@@ -124,7 +124,7 @@
                 "DetumblingOn" : 1.0,
                 "PointingOff" : 10.0,
                 "PointingOn" : 12.0,
-                "PointingDwellTime" : 60,
+                "PointingDwellTime" : 90,
                 "UnitInfo" : "deg/s, deg/s, deg, deg, s"
             }
     }

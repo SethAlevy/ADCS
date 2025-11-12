@@ -202,7 +202,7 @@ class Satellite(ABC):
     @property
     def pointing_error_angle(self) -> np.ndarray:
         """
-        Get the pointing error angle in degrees. This is the angle between the 
+        Get the pointing error angle in degrees. This is the angle between the
         vector that the satellite is aligned to and the Earth vector in ECI frame.
         Initialized as 0.0 and updated after pointing was launched.
 
@@ -210,7 +210,7 @@ class Satellite(ABC):
             np.ndarray: Pointing error angle in degrees.
         """
         pass
-    
+
     @property
     def torque(self) -> np.ndarray:
         """
@@ -221,7 +221,7 @@ class Satellite(ABC):
             np.ndarray: Torque applied by the magnetorquers in Nm.
         """
         pass
-        
+
     @property
     def angular_acceleration(self) -> np.ndarray:
         """
@@ -244,11 +244,7 @@ class Satellite(ABC):
 
     @abstractmethod
     def apply_triad(
-            self,
-            v1_i: np.ndarray,
-            v2_i: np.ndarray,
-            v1_b: np.ndarray,
-            v2_b: np.ndarray
+        self, v1_i: np.ndarray, v2_i: np.ndarray, v1_b: np.ndarray, v2_b: np.ndarray
     ) -> None:
         """
         Apply the TRIAD algorithm for attitude determination of two sensors.
@@ -267,9 +263,7 @@ class Satellite(ABC):
 
     @abstractmethod
     def apply_quest(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray]
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> None:
         """
         Apply the QUEST algorithm for attitude determination of at least two
@@ -286,9 +280,9 @@ class Satellite(ABC):
 
     @abstractmethod
     def apply_ekf(
-            self,
-            v_b_list: list[np.ndarray],
-            v_i_list: list[np.ndarray],
+        self,
+        v_b_list: list[np.ndarray],
+        v_i_list: list[np.ndarray],
     ) -> None:
         """
         Apply the Extended Kalman Filter (EKF) for attitude estimation of at

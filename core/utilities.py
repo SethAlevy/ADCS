@@ -46,32 +46,44 @@ def basic_state_vector(satellite: Satellite) -> None:
     angular_velocity = satellite.angular_velocity
 
     satellite._state_vector.register_vector(
-        "position", position, labels=['x', 'y', 'z'])
+        "position", position, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "velocity", velocity, labels=['x', 'y', 'z'])
+        "velocity", velocity, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_value("latitude", satellite.latitude)
     satellite._state_vector.register_value("longitude", satellite.longitude)
     satellite._state_vector.register_value("altitude", satellite.altitude)
     satellite._state_vector.register_vector(
-        "euler_angles", euler_angles, labels=['x1', 'y1', 'z1'])
+        "euler_angles", euler_angles, labels=["x1", "y1", "z1"]
+    )
     satellite._state_vector.register_vector(
-        "angular_velocity", angular_velocity, labels=['x', 'y', 'z'])
+        "angular_velocity", angular_velocity, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "magnetic_field_sbf", mag_field_sbf, labels=['x', 'y', 'z'])
+        "magnetic_field_sbf", mag_field_sbf, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "magnetic_field_eci", mag_field_eci, labels=['x', 'y', 'z'])
+        "magnetic_field_eci", mag_field_eci, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "sun_vector_sbf", sun_vector_sbf, labels=['x', 'y', 'z'])
+        "sun_vector_sbf", sun_vector_sbf, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "sun_vector_eci", sun_vector_eci, labels=['x', 'y', 'z'])
+        "sun_vector_eci", sun_vector_eci, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "torque", satellite.torque, labels=['x', 'y', 'z'])
+        "torque", satellite.torque, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_vector(
-        "angular_acceleration", satellite._angular_acceleration, labels=['x', 'y', 'z'])
+        "angular_acceleration", satellite._angular_acceleration, labels=["x", "y", "z"]
+    )
     satellite._state_vector.register_value(
-        "pointing_error", satellite.pointing_error_angle)
+        "pointing_error", satellite.pointing_error_angle
+    )
     satellite._state_vector.register_vector(
-        "quaternion", satellite.quaternion, labels=['x', 'y', 'z', 'w'])
+        "quaternion", satellite.quaternion, labels=["x", "y", "z", "w"]
+    )
 
 
 def get_lla(satellite: Satellite) -> tuple:
@@ -140,11 +152,7 @@ def skew_symmetric(v: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Skew-symmetric matrix.
     """
-    return np.array([
-        [0, -v[2], v[1]],
-        [v[2], 0, -v[0]],
-        [-v[1], v[0], 0]
-    ])
+    return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
 
 
 def filter_significant_digits(array: np.ndarray, sig_digits: int) -> np.ndarray:
@@ -213,8 +221,7 @@ def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray
 
 
 def calculate_pointing_error(
-    target_vector: np.ndarray,
-    current_vector: np.ndarray
+    target_vector: np.ndarray, current_vector: np.ndarray
 ) -> float:
     """
     Calculate the pointing error angle between two vectors in degrees.
