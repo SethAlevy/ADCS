@@ -6,6 +6,9 @@ from matplotlib import cycler
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import plotly.io as pio
 
 
 @dataclass
@@ -85,7 +88,8 @@ class MatplotlibPlots:
         legend: bool = True,
     ) -> None:
         fig, ax = self.cfg.figure()
-        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}", xlabel, ylabel, self.cfg.grid)
+        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}",
+                       xlabel, ylabel, self.cfg.grid)
 
         if isinstance(series, dict):
             items = [(xy[0], xy[1], label) for label, xy in series.items()]
@@ -115,7 +119,8 @@ class MatplotlibPlots:
         legend: bool = True,
     ) -> None:
         fig, ax = self.cfg.figure()
-        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}", xlabel, ylabel, self.cfg.grid)
+        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}",
+                       xlabel, ylabel, self.cfg.grid)
 
         if isinstance(series, dict):
             items = [(xy[0], xy[1], label) for label, xy in series.items()]
@@ -142,7 +147,8 @@ class MatplotlibPlots:
         filename: str,
     ) -> None:
         fig, ax1 = self.cfg.figure()
-        self._setup_ax(ax1, f"{self.cfg.title_prefix}{title}", xlabel, y1_label, self.cfg.grid)
+        self._setup_ax(ax1, f"{self.cfg.title_prefix}{title}",
+                       xlabel, y1_label, self.cfg.grid)
 
         # primary series
         for label, (x, y) in primary.items():
@@ -444,3 +450,276 @@ class MatplotlibPlots:
         self.plot_pointing_error(state_vector)
         self.plot_sun_vector_eci(state_vector)
         self.plot_sun_vector_sbf(state_vector)
+
+
+class PlotlyPlots:
+    def __init__(self, output_dir: Path | None = None, save: bool = False, show: bool = False, renderer: str | None = None) -> None:
+        self.output_dir = (output_dir or Path(__file__).resolve().parent)
+        self.plots_dir = self.output_dir / "plots"
+        self.plots_dir.mkdir(parents=True, exist_ok=True)
+        self.save = save
+        self.show = show
+        if renderer:
+            pio.renderers.default = renderer
+
+    def _save(self, fig: go.Figure, filename: str) -> None:
+        out_html = self.plots_dir / f"{filename}.html"
+        fig.write_html(str(out_html), include_plotlyjs="cdn")
+
+    def plot_orbit(self, df: pd.DataFrame, planet_radius_km: float | None = None) -> go.Figure:
+        fig = go.Figure()
+        if all(c in df for c in ["position_x", "position_y", "position_z"]):
+            fig.add_trace(go.Scatter3d(
+                x=df["position_x"], y=df["position_y"], z=df["position_z"],
+                mode="lines", line=dict(width=4, color="red"), name="Orbit"
+            ))
+        fig.update_layout(scene=dict(
+            xaxis_title="X (km)", yaxis_title="Y (km)", zaxis_title="Z (km)"),
+            scene_aspectmode="data", title="Orbit GCRS (ECEF)")
+        if self.save:
+            self._save(fig, "orbit_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_position(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col in ["position_x", "position_y", "position_z"]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=col)
+        fig.update_layout(title="Satellite Position in GCRS",
+                          xaxis_title="Time (s)", yaxis_title="Position (km)")
+        if self.save:
+            self._save(fig, "position_GCRS_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_lla(self, df: pd.DataFrame) -> go.Figure:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        x = df.index
+        if "latitude" in df:
+            fig.add_scatter(x=x, y=df["latitude"], mode="lines",
+                            name="Latitude", secondary_y=False)
+        if "longitude" in df:
+            fig.add_scatter(x=x, y=df["longitude"], mode="lines",
+                            name="Longitude", secondary_y=False)
+        if "altitude" in df:
+            fig.add_scatter(x=x, y=df["altitude"], mode="lines",
+                            name="Altitude", secondary_y=True)
+        fig.update_xaxes(title_text="Time (s)")
+        fig.update_yaxes(title_text="Latitude/Longitude (deg)", secondary_y=False)
+        fig.update_yaxes(title_text="Altitude (km)", secondary_y=True)
+        fig.update_layout(title="Satellite Position in LLA")
+        if self.save:
+            self._save(fig, "lla_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_magnetic_field_sbf(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col, name in [("magnetic_field_sbf_x", "SBF X"), ("magnetic_field_sbf_y", "SBF Y"), ("magnetic_field_sbf_z", "SBF Z")]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=name)
+        fig.update_layout(title="Satellite Magnetic Field in SBF",
+                          xaxis_title="Time (s)", yaxis_title="Magnetic Field (nT)")
+        if self.save:
+            self._save(fig, "magnetic_field_sbf_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_magnetic_field_eci(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col, name in [("magnetic_field_eci_x", "ECI X"), ("magnetic_field_eci_y", "ECI Y"), ("magnetic_field_eci_z", "ECI Z")]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=name)
+        fig.update_layout(title="Satellite Magnetic Field in ECI",
+                          xaxis_title="Time (s)", yaxis_title="Magnetic Field (nT)")
+        if self.save:
+            self._save(fig, "magnetic_field_eci_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_angular_velocity(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        cols = ["angular_velocity_x", "angular_velocity_y", "angular_velocity_z"]
+        names = ["wx", "wy", "wz"]
+        for c, n in zip(cols, names):
+            if c in df:
+                fig.add_scatter(x=x, y=df[c], mode="lines", name=n)
+        if all(c in df for c in cols):
+            wmag = np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2)
+            fig.add_scatter(x=x, y=wmag, mode="lines", name="|w|")
+        fig.update_layout(title="Satellite Angular Velocity",
+                          xaxis_title="Time (s)", yaxis_title="deg/s")
+        if self.save:
+            self._save(fig, "angular_velocity_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_euler_angles(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col, name in [("euler_angles_x1", "roll (Phi)"), ("euler_angles_y1", "pitch (Theta)"), ("euler_angles_z1", "yaw (Psi)")]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=name)
+        fig.update_layout(title="Satellite Euler Angles",
+                          xaxis_title="Time (s)", yaxis_title="deg")
+        if self.save:
+            self._save(fig, "euler_angles_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_torque(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        cols = ["torque_x", "torque_y", "torque_z"]
+        names = ["Torque X", "Torque Y", "Torque Z"]
+        for c, n in zip(cols, names):
+            if c in df:
+                fig.add_scatter(x=x, y=df[c], mode="lines", name=n)
+        if all(c in df for c in cols):
+            tmag = np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2)
+            fig.add_scatter(x=x, y=tmag, mode="lines", name="|Torque|")
+        fig.update_layout(title="Magnetorquer Applied Torque",
+                          xaxis_title="Time (s)", yaxis_title="N·m")
+        if self.save:
+            self._save(fig, "torque_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_pointing_error(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        if "pointing_error" in df:
+            fig.add_scatter(x=x, y=df["pointing_error"],
+                            mode="markers", name="Pointing Error")
+        fig.update_layout(title="Satellite Pointing Error",
+                          xaxis_title="Time (s)", yaxis_title="deg")
+        if self.save:
+            self._save(fig, "pointing_error_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_sun_vector_eci(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col, name in [("sun_vector_eci_x", "ECI X"), ("sun_vector_eci_y", "ECI Y"), ("sun_vector_eci_z", "ECI Z")]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=name)
+        fig.update_layout(title="Satellite Sun Vector in ECI",
+                          xaxis_title="Time (s)", yaxis_title="Sun Vector (ECI)")
+        if self.save:
+            self._save(fig, "sun_vector_eci_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def plot_sun_vector_sbf(self, df: pd.DataFrame) -> go.Figure:
+        fig = go.Figure()
+        x = df.index
+        for col, name in [("sun_vector_sbf_x", "SBF X"), ("sun_vector_sbf_y", "SBF Y"), ("sun_vector_sbf_z", "SBF Z")]:
+            if col in df:
+                fig.add_scatter(x=x, y=df[col], mode="lines", name=name)
+        fig.update_layout(title="Satellite Sun Vector in SBF",
+                          xaxis_title="Time (s)", yaxis_title="Sun Vector (SBF)")
+        if self.save:
+            self._save(fig, "sun_vector_sbf_plotly")
+        if self.show:
+            fig.show()
+        return fig
+
+    def basic_plots(self, df: pd.DataFrame, setup=None) -> None:
+        self.plot_orbit(df, getattr(setup, "planet_data", {}
+                                    ).get("R", None) if setup else None)
+        self.plot_position(df)
+        self.plot_lla(df)
+        self.plot_magnetic_field_sbf(df)
+        self.plot_magnetic_field_eci(df)
+        self.plot_angular_velocity(df)
+        self.plot_euler_angles(df)
+        self.plot_torque(df)
+        if "angular_acceleration_x" in df:  # optional
+            fig = go.Figure()
+            x = df.index
+            cols = ["angular_acceleration_x",
+                    "angular_acceleration_y", "angular_acceleration_z"]
+            names = ["Alpha X", "Alpha Y", "Alpha Z"]
+            for c, n in zip(cols, names):
+                if c in df:
+                    fig.add_scatter(x=x, y=df[c], mode="lines", name=n)
+            fig.update_layout(title="Satellite Angular Acceleration",
+                              xaxis_title="Time (s)", yaxis_title="deg/s²")
+            if self.save:
+                self._save(fig, "angular_acceleration_plotly")
+            if self.show:
+                fig.show()
+        self.plot_pointing_error(df)
+        self.plot_sun_vector_eci(df)
+        self.plot_sun_vector_sbf(df)
+
+
+class LivePlotlyLine:
+    """
+    Real-time line plotting with Plotly FigureWidget.
+    Call update(t, ys) inside your loop; display appears automatically in notebooks.
+    """
+
+    def __init__(self, labels: list[str], title: str, xlabel: str, ylabel: str,
+                 window: float | None = None, max_points: int = 10000,
+                 output_dir: Path | None = None):
+        self.fig = go.FigureWidget()
+        self.window = window
+        self.max_points = max_points
+        # where to save HTML by default
+        self.output_dir = (output_dir or (Path(__file__).resolve().parent / "plots"))
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._xs: list[float] = []
+        self._ys: list[list[float]] = [[] for _ in labels]
+        for lbl in labels:
+            self.fig.add_scatter(mode="lines", name=lbl)
+        self.fig.update_layout(title=title, xaxis_title=xlabel, yaxis_title=ylabel)
+        try:
+            from IPython.display import display
+            display(self.fig)
+        except Exception:
+            pass
+
+    def update(self, t: float, ys: list[float] | tuple[float, ...]) -> None:
+        self._xs.append(float(t))
+        for i, v in enumerate(ys):
+            self._ys[i].append(float(v))
+        # enforce max_points
+        if len(self._xs) > self.max_points:
+            cut = len(self._xs) - self.max_points
+            self._xs = self._xs[cut:]
+            self._ys = [series[cut:] for series in self._ys]
+        # rolling window
+        xs = self._xs
+        if self.window is not None and len(xs) >= 2:
+            left = xs[-1] - self.window
+            start = next((i for i, xv in enumerate(xs) if xv >= left), 0)
+            xs = xs[start:]
+            ys_trim = [series[start:] for series in self._ys]
+        else:
+            ys_trim = self._ys
+        with self.fig.batch_update():
+            for i, tr in enumerate(self.fig.data):
+                tr.x = xs
+                tr.y = ys_trim[i]
+
+    def finish(self, filename: str | None = None) -> None:
+        if filename:
+            out = self.output_dir / f"{filename}.html"
+            self.fig.write_html(str(out), include_plotlyjs="cdn")
