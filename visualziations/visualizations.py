@@ -1,579 +1,446 @@
 import matplotlib.pyplot as plt
 from templates.initial_settings_template import SimulationSetup
+from typing import Iterable, Tuple, Optional
+from dataclasses import dataclass, field
+from matplotlib import cycler
 from pathlib import Path
 import pandas as pd
 import numpy as np
 
 
-def plot_orbit(
-    state_vector: pd.DataFrame,
-    setup: SimulationSetup,
-    output_dir: Path = Path(__file__).resolve().parent,
-) -> None:
-    """
-    Plot the orbit of the satellite in 3D. All plots are saved in the
-    plots directory.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        setup (SimulationSetup): The simulation setup object containing
-            parameters about the satellite, planet etc.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    # draw sphere
-    u, v = np.mgrid[0 : 2 * np.pi : 40j, 0 : np.pi : 20j]
-    x = np.cos(u) * np.sin(v) * setup.planet_data["R"] / 1000
-    y = np.sin(u) * np.sin(v) * setup.planet_data["R"] / 1000
-    z = np.cos(v) * setup.planet_data["R"] / 1000
-
-    ax.set_title("Orbit GCRS (ECEF)")
-    ax.plot_wireframe(x, y, z, color="g")
-    ax.scatter(
-        state_vector["position_x"],
-        state_vector["position_y"],
-        state_vector["position_z"],
-        color="r",
-        s=20,
-    )
-    ax.set_aspect("equal")
-    ax.legend(["Earth Surface", "Orbit"])
-    plt.savefig(
-        output_dir.joinpath("plots", "orbit.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_lla(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the latitude, longitude and altitude of the satellite over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax1 = plt.subplots()
-
-    ax1.set_xlabel("Time (s)")
-    ax1.set_ylabel("Latitude and longitude (degrees)", color="tab:blue")
-    ax1.plot(
-        state_vector.index, state_vector["latitude"], color="tab:blue", label="Latitude"
-    )
-    ax1.plot(
-        state_vector.index,
-        state_vector["longitude"],
-        color="tab:orange",
-        label="Longitude",
-    )
-
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Altitude (km)", color="tab:green")
-
-    ax2.plot(
-        state_vector.index,
-        state_vector["altitude"],
-        color="tab:green",
-        label="Altitude",
-    )
-
-    ax2.tick_params(axis="y", labelcolor="tab:green")
-    fig.tight_layout()  # otherwise the right y-label is slightly clipped
-    ax1.grid()
-
-    ax1.set_title("Satellite Position in LLA")
-    lines, labels = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax2.legend(lines + lines2, labels + labels2, loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "lla.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_position(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the position of the satellite in GCRS (ECI) frame over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Position (km)", color="tab:blue")
-    ax.plot(state_vector.index, state_vector["position_x"], color="tab:blue")
-    ax.plot(state_vector.index, state_vector["position_y"], color="tab:orange")
-    ax.plot(state_vector.index, state_vector["position_z"], color="tab:green")
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Position in GCRS")
-    ax.legend(["X", "Y", "Z"], loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "position_GCRS.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_magnetic_field_sbf(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the magnetic field measured by the satellite in SBF over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Magnetic Field (nT)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_sbf_x"],
-        color="tab:blue",
-        label="SBF X",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_sbf_y"],
-        color="tab:orange",
-        label="SBF Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_sbf_z"],
-        color="tab:green",
-        label="SBF Z",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Magnetic Field in SBF")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "magnetic_field_sbf.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_magnetic_field_eci(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the magnetic field in ECI over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Magnetic Field (nT)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_eci_x"],
-        color="tab:blue",
-        label="ECI X",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_eci_y"],
-        color="tab:orange",
-        label="ECI Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["magnetic_field_eci_z"],
-        color="tab:green",
-        label="ECI Z",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Magnetic Field in ECI")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "magnetic_field_eci.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_angular_velocity(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the angular velocity of the satellite over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Angular Velocity (deg/s)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_velocity_x"],
-        color="tab:blue",
-        label="wx",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_velocity_y"],
-        color="tab:orange",
-        label="wy",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_velocity_z"],
-        color="tab:green",
-        label="wz",
-    )
-
-    angular_velocity_magn = np.sqrt(
-        state_vector["angular_velocity_x"] ** 2
-        + state_vector["angular_velocity_y"] ** 2
-        + state_vector["angular_velocity_z"] ** 2
-    )
-
-    ax.plot(state_vector.index, angular_velocity_magn, color="tab:red", label="|w|")
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Angular Velocity")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "angular_velocity.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_euler_angles(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the Euler angles of the satellite over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Euler Angles (degrees)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["euler_angles_x1"],
-        color="tab:blue",
-        label="roll (Phi)",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["euler_angles_y1"],
-        color="tab:orange",
-        label="pitch (Theta)",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["euler_angles_z1"],
-        color="tab:green",
-        label="yaw (Psi)",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Euler Angles")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "euler_angles.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_torque(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the torque applied by the magnetorquers over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Torque (N·m)", color="tab:blue")
-    ax.plot(
-        state_vector.index, state_vector["torque_x"], color="tab:blue", label="Torque X"
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["torque_y"],
-        color="tab:orange",
-        label="Torque Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["torque_z"],
-        color="tab:green",
-        label="Torque Z",
-    )
-
-    torque_magn = np.sqrt(
-        state_vector["torque_x"] ** 2
-        + state_vector["torque_y"] ** 2
-        + state_vector["torque_z"] ** 2
-    )
-
-    ax.plot(state_vector.index, torque_magn, color="tab:red", label="|Torque|")
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Magnetorquer Applied Torque")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "torque.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_angular_acceleration(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the angular acceleration of the satellite over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Angular Acceleration (deg/s²)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_acceleration_x"],
-        color="tab:blue",
-        label="Alpha X",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_acceleration_y"],
-        color="tab:orange",
-        label="Alpha Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["angular_acceleration_z"],
-        color="tab:green",
-        label="Alpha Z",
-    )
-
-    angular_acceleration_magn = np.sqrt(
-        state_vector["angular_acceleration_x"] ** 2
-        + state_vector["angular_acceleration_y"] ** 2
-        + state_vector["angular_acceleration_z"] ** 2
-    )
-
-    ax.plot(
-        state_vector.index, angular_acceleration_magn, color="tab:red", label="|Alpha|"
-    )
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Angular Acceleration")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "angular_acceleration.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_pointing_error(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the pointing error of the satellite over time.
-
-    Args:
-        state_vector (pd.DataFrame): The state vector of the satellite.
-        output_dir (Path): The directory to save the plots.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Pointing Error (degrees)", color="tab:blue")
-    ax.scatter(
-        state_vector.index,
-        state_vector["pointing_error"],
-        color="tab:blue",
-        marker="x",
-        label="Pointing Error",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-
-    ax.set_title("Satellite Pointing Error")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "pointing_error.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_sun_vector_eci(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the sun vector in ECI frame over time.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Sun Vector (ECI)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_eci_x"],
-        color="tab:blue",
-        label="ECI X",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_eci_y"],
-        color="tab:orange",
-        label="ECI Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_eci_z"],
-        color="tab:green",
-        label="ECI Z",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-    ax.set_title("Satellite Sun Vector in ECI")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "sun_vector_eci.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
-
-
-def plot_sun_vector_sbf(
-    state_vector: pd.DataFrame, output_dir: Path = Path(__file__).resolve().parent
-) -> None:
-    """
-    Plot the sun vector in SBF frame over time.
-    """
-    output_dir.joinpath("plots").mkdir(parents=True, exist_ok=True)
-
-    fig, ax = plt.subplots()
-
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Sun Vector (SBF)", color="tab:blue")
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_sbf_x"],
-        color="tab:blue",
-        label="SBF X",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_sbf_y"],
-        color="tab:orange",
-        label="SBF Y",
-    )
-    ax.plot(
-        state_vector.index,
-        state_vector["sun_vector_sbf_z"],
-        color="tab:green",
-        label="SBF Z",
-    )
-
-    fig.tight_layout()
-    ax.grid()
-    ax.set_title("Satellite Sun Vector in SBF")
-    ax.legend(loc=0)
-
-    plt.savefig(
-        output_dir.joinpath("plots", "sun_vector_sbf.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
+@dataclass
+class PlotConfig:
+    output_dir: Path
+    subdir: str = "plots"
+    save: bool = True
+    show: bool = False
+    dpi: int = 300
+    format: str = "png"
+
+    # Style
+    figsize: Tuple[float, float] = (8.0, 6.0)
+    style: Optional[str] = None              # e.g. "seaborn-v0_8-paper"
+    grid: bool = True
+    legend_loc: int | str = 0
+    title_prefix: str = ""                   # e.g., "Satellite "
+    color_cycle: Optional[Iterable[str]] = field(default=None)
+    linewidth: float = 1.5
+    markersize: float = 4.0
+
+    # 3D Earth wireframe (plot_orbit)
+    sphere_res_u: int = 40
+    sphere_res_v: int = 20
+
+    def apply(self) -> None:
+        if self.style:
+            plt.style.use(self.style)
+        if self.color_cycle:
+            plt.rcParams["axes.prop_cycle"] = cycler(color=list(self.color_cycle))
+
+    @property
+    def plots_dir(self) -> Path:
+        p = self.output_dir / self.subdir
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def figure(self, projection: Optional[str] = None):
+        # Always apply styling before creating a figure
+        self.apply()
+        kwargs = {}
+        if projection:
+            kwargs["subplot_kw"] = {"projection": projection}
+        fig, ax = plt.subplots(figsize=self.figsize, **kwargs)
+        return fig, ax
+
+    def finalize(self, fig, filename: str) -> None:
+        if self.save:
+            fig.savefig(self.plots_dir /
+                        f"{filename}.{self.format}", dpi=self.dpi, bbox_inches="tight")
+        if self.show:
+            plt.show()
+        plt.close(fig)
+
+
+class MatplotlibPlots:
+    def __init__(self, output_dir=Path(__file__).resolve().parent) -> None:
+        self.cfg = PlotConfig(output_dir=output_dir)
+
+    def _setup_ax(self, ax, title: str, xlabel: str, ylabel: str, grid: bool) -> None:
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        if grid:
+            ax.grid()
+
+    def line_plot(
+        self,
+        series: (
+            list[tuple[np.ndarray, np.ndarray, str]]
+            | dict[str, tuple[np.ndarray, np.ndarray]]
+        ),
+        title: str,
+        xlabel: str,
+        ylabel: str,
+        filename: str,
+        legend: bool = True,
+    ) -> None:
+        fig, ax = self.cfg.figure()
+        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}", xlabel, ylabel, self.cfg.grid)
+
+        if isinstance(series, dict):
+            items = [(xy[0], xy[1], label) for label, xy in series.items()]
+        else:
+            items = series
+
+        for x, y, label in items:
+            ax.plot(x, y, linewidth=self.cfg.linewidth, label=label)
+
+        if legend:
+            ax.legend(loc=self.cfg.legend_loc)
+
+        fig.tight_layout()
+        self.cfg.finalize(fig, filename)
+
+    def scatter_plot(
+        self,
+        series: (
+            list[tuple[np.ndarray, np.ndarray, str]]
+            | dict[str, tuple[np.ndarray, np.ndarray]]
+        ),
+        title: str,
+        xlabel: str,
+        ylabel: str,
+        filename: str,
+        marker: str = "x",
+        legend: bool = True,
+    ) -> None:
+        fig, ax = self.cfg.figure()
+        self._setup_ax(ax, f"{self.cfg.title_prefix}{title}", xlabel, ylabel, self.cfg.grid)
+
+        if isinstance(series, dict):
+            items = [(xy[0], xy[1], label) for label, xy in series.items()]
+        else:
+            items = series
+
+        for x, y, label in items:
+            ax.scatter(x, y, s=self.cfg.markersize, marker=marker, label=label)
+
+        if legend:
+            ax.legend(loc=self.cfg.legend_loc)
+
+        fig.tight_layout()
+        self.cfg.finalize(fig, filename)
+
+    def twin_axis_line_plot(
+        self,
+        primary: dict[str, tuple[np.ndarray, np.ndarray]],
+        secondary: dict[str, tuple[np.ndarray, np.ndarray]],
+        title: str,
+        xlabel: str,
+        y1_label: str,
+        y2_label: str,
+        filename: str,
+    ) -> None:
+        fig, ax1 = self.cfg.figure()
+        self._setup_ax(ax1, f"{self.cfg.title_prefix}{title}", xlabel, y1_label, self.cfg.grid)
+
+        # primary series
+        for label, (x, y) in primary.items():
+            ax1.plot(x, y, linewidth=self.cfg.linewidth, label=label)
+
+        # secondary axis
+        ax2 = ax1.twinx()
+        ax2.set_ylabel(y2_label)
+        for label, (x, y) in secondary.items():
+            ax2.plot(x, y, linewidth=self.cfg.linewidth, label=label)
+
+        # combined legend on ax2
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines1 + lines2, labels1 + labels2, loc=self.cfg.legend_loc)
+
+        fig.tight_layout()
+        self.cfg.finalize(fig, filename)
+
+    def orbit_3d_plot(
+        self,
+        positions_km: np.ndarray,
+        planet_radius_km: float,
+        filename: str = "orbit",
+        title: str = "Orbit GCRS (ECEF)",
+        point_size: float = 20.0,
+        orbit_color: str = "r",
+        surface_color: str = "g",
+    ) -> None:
+        fig, ax = self.cfg.figure(projection="3d")
+
+        # Sphere wireframe
+        u = np.linspace(0, 2 * np.pi, self.cfg.sphere_res_u)
+        v = np.linspace(0, np.pi, self.cfg.sphere_res_v)
+        uu, vv = np.meshgrid(u, v)
+        x = np.cos(uu) * np.sin(vv) * planet_radius_km
+        y = np.sin(uu) * np.sin(vv) * planet_radius_km
+        z = np.cos(vv) * planet_radius_km
+        ax.plot_wireframe(x, y, z, color=surface_color)
+
+        # Orbit points
+        ax.scatter(positions_km[:, 0], positions_km[:, 1],
+                   positions_km[:, 2], color=orbit_color, s=point_size)
+
+        ax.set_aspect("auto")
+        ax.set_title(f"{self.cfg.title_prefix}{title}")
+        ax.legend(["Surface", "Orbit"], loc=self.cfg.legend_loc)
+        self.cfg.finalize(fig, filename)
+
+    # High-level plots
+    def plot_orbit(
+        self,
+        state_vector: pd.DataFrame,
+        setup: SimulationSetup,
+    ) -> None:
+        positions = np.column_stack(
+            [
+                state_vector["position_x"],
+                state_vector["position_y"],
+                state_vector["position_z"],
+            ]
+        )
+        planet_radius_km = setup.planet_data["R"] / 1000.0
+        self.orbit_3d_plot(
+            positions_km=positions,
+            planet_radius_km=planet_radius_km,
+            filename="orbit",
+            title="Orbit GCRS (ECEF)",
+        )
+
+    def plot_lla(self, state_vector: pd.DataFrame) -> None:
+        primary = {
+            "Latitude": (state_vector.index.values, state_vector["latitude"].values),
+            "Longitude": (state_vector.index.values, state_vector["longitude"].values),
+        }
+        secondary = {
+            "Altitude": (state_vector.index.values, state_vector["altitude"].values),
+        }
+        self.twin_axis_line_plot(
+            primary=primary,
+            secondary=secondary,
+            title="Satellite Position in LLA",
+            xlabel="Time (s)",
+            y1_label="Latitude and longitude (degrees)",
+            y2_label="Altitude (km)",
+            filename="lla",
+        )
+
+    def plot_position(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "X": (state_vector.index.values, state_vector["position_x"].values),
+            "Y": (state_vector.index.values, state_vector["position_y"].values),
+            "Z": (state_vector.index.values, state_vector["position_z"].values),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Position in GCRS",
+            xlabel="Time (s)",
+            ylabel="Position (km)",
+            filename="position_GCRS",
+        )
+
+    def plot_magnetic_field_sbf(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "SBF X": (
+                state_vector.index.values,
+                state_vector["magnetic_field_sbf_x"].values,
+            ),
+            "SBF Y": (
+                state_vector.index.values,
+                state_vector["magnetic_field_sbf_y"].values,
+            ),
+            "SBF Z": (
+                state_vector.index.values,
+                state_vector["magnetic_field_sbf_z"].values,
+            ),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Magnetic Field in SBF",
+            xlabel="Time (s)",
+            ylabel="Magnetic Field (nT)",
+            filename="magnetic_field_sbf",
+        )
+
+    def plot_magnetic_field_eci(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "ECI X": (
+                state_vector.index.values,
+                state_vector["magnetic_field_eci_x"].values,
+            ),
+            "ECI Y": (
+                state_vector.index.values,
+                state_vector["magnetic_field_eci_y"].values,
+            ),
+            "ECI Z": (
+                state_vector.index.values,
+                state_vector["magnetic_field_eci_z"].values,
+            ),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Magnetic Field in ECI",
+            xlabel="Time (s)",
+            ylabel="Magnetic Field (nT)",
+            filename="magnetic_field_eci",
+        )
+
+    def plot_angular_velocity(self, state_vector: pd.DataFrame) -> None:
+        wmag = np.sqrt(
+            state_vector["angular_velocity_x"].values**2
+            + state_vector["angular_velocity_y"].values**2
+            + state_vector["angular_velocity_z"].values**2
+        )
+        series = {
+            "wx": (state_vector.index.values, state_vector["angular_velocity_x"].values),
+            "wy": (state_vector.index.values, state_vector["angular_velocity_y"].values),
+            "wz": (state_vector.index.values, state_vector["angular_velocity_z"].values),
+            "|w|": (state_vector.index.values, wmag),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Angular Velocity",
+            xlabel="Time (s)",
+            ylabel="Angular Velocity (deg/s)",
+            filename="angular_velocity",
+        )
+
+    def plot_euler_angles(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "roll (Phi)": (
+                state_vector.index.values,
+                state_vector["euler_angles_x1"].values,
+            ),
+            "pitch (Theta)": (
+                state_vector.index.values,
+                state_vector["euler_angles_y1"].values,
+            ),
+            "yaw (Psi)": (
+                state_vector.index.values,
+                state_vector["euler_angles_z1"].values,
+            ),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Euler Angles",
+            xlabel="Time (s)",
+            ylabel="Euler Angles (degrees)",
+            filename="euler_angles",
+        )
+
+    def plot_torque(self, state_vector: pd.DataFrame) -> None:
+        tmag = np.sqrt(
+            state_vector["torque_x"].values**2
+            + state_vector["torque_y"].values**2
+            + state_vector["torque_z"].values**2
+        )
+        series = {
+            "Torque X": (state_vector.index.values, state_vector["torque_x"].values),
+            "Torque Y": (state_vector.index.values, state_vector["torque_y"].values),
+            "Torque Z": (state_vector.index.values, state_vector["torque_z"].values),
+            "|Torque|": (state_vector.index.values, tmag),
+        }
+        self.line_plot(
+            series=series,
+            title="Magnetorquer Applied Torque",
+            xlabel="Time (s)",
+            ylabel="Torque (N·m)",
+            filename="torque",
+        )
+
+    def plot_angular_acceleration(self, state_vector: pd.DataFrame) -> None:
+        amag = np.sqrt(
+            state_vector["angular_acceleration_x"].values**2
+            + state_vector["angular_acceleration_y"].values**2
+            + state_vector["angular_acceleration_z"].values**2
+        )
+        series = {
+            "Alpha X": (
+                state_vector.index.values,
+                state_vector["angular_acceleration_x"].values,
+            ),
+            "Alpha Y": (
+                state_vector.index.values,
+                state_vector["angular_acceleration_y"].values,
+            ),
+            "Alpha Z": (
+                state_vector.index.values,
+                state_vector["angular_acceleration_z"].values,
+            ),
+            "|Alpha|": (state_vector.index.values, amag),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Angular Acceleration",
+            xlabel="Time (s)",
+            ylabel="Angular Acceleration (deg/s²)",
+            filename="angular_acceleration",
+        )
+
+    def plot_pointing_error(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "Pointing Error": (
+                state_vector.index.values,
+                state_vector["pointing_error"].values,
+            ),
+        }
+        self.scatter_plot(
+            series=series,
+            title="Satellite Pointing Error",
+            xlabel="Time (s)",
+            ylabel="Pointing Error (degrees)",
+            filename="pointing_error",
+            marker="x",
+        )
+
+    def plot_sun_vector_eci(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "ECI X": (state_vector.index.values, state_vector["sun_vector_eci_x"].values),
+            "ECI Y": (state_vector.index.values, state_vector["sun_vector_eci_y"].values),
+            "ECI Z": (state_vector.index.values, state_vector["sun_vector_eci_z"].values),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Sun Vector in ECI",
+            xlabel="Time (s)",
+            ylabel="Sun Vector (ECI)",
+            filename="sun_vector_eci",
+        )
+
+    def plot_sun_vector_sbf(self, state_vector: pd.DataFrame) -> None:
+        series = {
+            "SBF X": (state_vector.index.values, state_vector["sun_vector_sbf_x"].values),
+            "SBF Y": (state_vector.index.values, state_vector["sun_vector_sbf_y"].values),
+            "SBF Z": (state_vector.index.values, state_vector["sun_vector_sbf_z"].values),
+        }
+        self.line_plot(
+            series=series,
+            title="Satellite Sun Vector in SBF",
+            xlabel="Time (s)",
+            ylabel="Sun Vector (SBF)",
+            filename="sun_vector_sbf",
+        )
+
+    def basic_plots(
+        self,
+        state_vector: pd.DataFrame,
+        setup: SimulationSetup,
+    ) -> None:
+        self.plot_orbit(state_vector, setup)
+        self.plot_position(state_vector)
+        self.plot_lla(state_vector)
+        self.plot_magnetic_field_sbf(state_vector)
+        self.plot_magnetic_field_eci(state_vector)
+        self.plot_angular_velocity(state_vector)
+        self.plot_euler_angles(state_vector)
+        self.plot_torque(state_vector)
+        self.plot_angular_acceleration(state_vector)
+        self.plot_pointing_error(state_vector)
+        self.plot_sun_vector_eci(state_vector)
+        self.plot_sun_vector_sbf(state_vector)
