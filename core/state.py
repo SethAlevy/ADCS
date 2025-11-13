@@ -7,6 +7,15 @@ class State:
         self._cols: dict[str, list[float]] = {}
         self._rows = 0
 
+    @property
+    def rows(self) -> int:
+        return self._rows
+
+    def reset(self) -> None:
+        """Clear all columns and row count."""
+        self._cols.clear()
+        self._rows = 0
+
     def _ensure_col(self, name: str) -> list[float]:
         if name not in self._cols:
             # back-fill all previous rows with NaN when a new column is introduced late
