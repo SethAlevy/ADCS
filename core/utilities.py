@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import skyfield.api as skyfield
 from templates.satellite_template import Satellite
+from core.logger import log, warn
 
 
 def time_julian_date(satellite: Satellite) -> skyfield.Time:
@@ -239,3 +240,23 @@ def calculate_pointing_error(
     angle_rad = np.arccos(dot_product)
     angle_deg = np.degrees(angle_rad)
     return angle_deg
+
+
+def log_init_state(setup) -> None:
+    """
+    Log initial simulation state.
+
+    Args:
+        setup: Simulation setup object.
+    """
+    log("Simulation initialized with the following parameters:")
+    log("Number of iterations: %s", setup.iterations_info["Stop"])
+    log("Satellite mass: %s kg", setup.satellite_params["Mass"])
+    log("Satellite inertia: %s kg*m^2", setup.satellite_params["Inertia"])
+    log("Initial angular velocity: %s deg/s", setup.angular_velocity)
+    log("Initial attitude (Euler angles): %s deg", setup.euler_angles)
+    log("Selected sensor fusion algorithm: %s", setup.sensor_fusion_algorithm)
+    log("Magnetometer noise: %s nT", setup.magnetometer["AbsoluteNoise"])
+    log("Sunsensor noise: %s degrees", setup.sunsensor["AngularNoise"])
+    log("Sensor on time: %s seconds, actuator on time: %s seconds \n",
+        setup.sensors_on_time, setup.actuators_on_time)

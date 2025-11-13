@@ -81,7 +81,8 @@ class SimulationSetupReader(SimulationSetup):
         data["LogInterval"] = int(
             self._setup["Simulation"]["Iterations"]["LogInterval"]
         )
-        data = self._check_for_additional_keys_in_section(self._setup["Simulation"]["Iterations"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Simulation"]["Iterations"], data)
         return data
 
     @property
@@ -97,10 +98,13 @@ class SimulationSetupReader(SimulationSetup):
         data = dict()
         data["Coils"] = int(self._setup["Actuators"]["Magnetorquer"]["Coils"])
         data["RodArea"] = float(self._setup["Actuators"]["Magnetorquer"]["RodArea"])
-        data["MaxCurrent"] = float(self._setup["Actuators"]["Magnetorquer"]["MaxCurrent"])
-        data["SafetyFactor"] = float(self._setup["Actuators"]["Magnetorquer"]["SafetyFactor"])
+        data["MaxCurrent"] = float(self._setup["Actuators"]
+                                   ["Magnetorquer"]["MaxCurrent"])
+        data["SafetyFactor"] = float(
+            self._setup["Actuators"]["Magnetorquer"]["SafetyFactor"])
         data["AlphaCap"] = float(self._setup["Actuators"]["Magnetorquer"]["AlphaCap"])
-        data = self._check_for_additional_keys_in_section(self._setup["Actuators"]["Magnetorquer"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Actuators"]["Magnetorquer"], data)
         return data
 
     @property
@@ -132,7 +136,8 @@ class SimulationSetupReader(SimulationSetup):
         data["G"] = float(self._setup["Simulation"]["PlanetConst"]["G"])
         data["M"] = float(self._setup["Simulation"]["PlanetConst"]["M"])
         data["R"] = float(self._setup["Simulation"]["PlanetConst"]["R"])
-        data = self._check_for_additional_keys_in_section(self._setup["Simulation"]["PlanetConst"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Simulation"]["PlanetConst"], data)
         return data
 
     @property
@@ -167,8 +172,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Noise"] = bool(self._setup["Sensors"]["Magnetometer"]["Noise"])
-        data["NoiseMax"] = float(self._setup["Sensors"]["Magnetometer"]["NoiseMax"])
-        data = self._check_for_additional_keys_in_section(self._setup["Sensors"]["Magnetometer"], data)
+        data["AbsoluteNoise"] = float(
+            self._setup["Sensors"]["Magnetometer"]["AbsoluteNoise"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Sensors"]["Magnetometer"], data)
         return data
 
     @property
@@ -182,8 +189,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Noise"] = bool(self._setup["Sensors"]["SunSensor"]["Noise"])
-        data["AngularNoise"] = float(self._setup["Sensors"]["SunSensor"]["AngularNoise"])
-        data = self._check_for_additional_keys_in_section(self._setup["Sensors"]["SunSensor"], data)
+        data["AngularNoise"] = float(
+            self._setup["Sensors"]["SunSensor"]["AngularNoise"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Sensors"]["SunSensor"], data)
         return data
 
     @property
@@ -197,8 +206,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Bias"] = np.array(self._setup["Sensors"]["Gyroscope"]["Bias"])
-        data["ProcessNoise"] = np.array(self._setup["Sensors"]["Gyroscope"]["ProcessNoise"])
-        data = self._check_for_additional_keys_in_section(self._setup["Sensors"]["Gyroscope"], data)
+        data["ProcessNoise"] = np.array(
+            self._setup["Sensors"]["Gyroscope"]["ProcessNoise"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Sensors"]["Gyroscope"], data)
         return data
 
     @property
@@ -211,7 +222,8 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Weights"] = np.array(self._setup["Sensors"]["QUEST"]["Weights"])
-        data = self._check_for_additional_keys_in_section(self._setup["Sensors"]["QUEST"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Sensors"]["QUEST"], data)
         return data
 
     @property
@@ -227,7 +239,8 @@ class SimulationSetupReader(SimulationSetup):
         data = dict()
         data["AttitudeNoise"] = np.array(self._setup["Sensors"]["EKF"]["AttitudeNoise"])
         data["Covariance"] = float(self._setup["Sensors"]["EKF"]["Covariance"])
-        data = self._check_for_additional_keys_in_section(self._setup["Sensors"]["EKF"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Sensors"]["EKF"], data)
         return data
 
     @property
@@ -270,7 +283,8 @@ class SimulationSetupReader(SimulationSetup):
         data["AdaptVelocity"] = bool(self._setup["Controls"]["Bdot"]["AdaptVelocity"])
         data["AdaptMagnetic"] = bool(self._setup["Controls"]["Bdot"]["AdaptMagnetic"])
         data["BangBang"] = bool(self._setup["Controls"]["Bdot"]["BangBang"])
-        data = self._check_for_additional_keys_in_section(self._setup["Controls"]["Bdot"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Controls"]["Bdot"], data)
         return data
 
     @property
@@ -296,12 +310,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Gain"] = float(self._setup["Controls"]["Bdot"]["Gain"])
-        data["ProportionalGain"] = float(self._setup["Controls"]["Bdot"]["ProportionalGain"])
-        data["AngularVelocityRef"] = float(self._setup["Controls"]["Bdot"]["AngularVelocityRef"])
+        data["ProportionalGain"] = float(
+            self._setup["Controls"]["Bdot"]["ProportionalGain"])
+        data["AngularVelocityRef"] = float(
+            self._setup["Controls"]["Bdot"]["AngularVelocityRef"])
         data["Alpha"] = float(self._setup["Controls"]["Bdot"]["Alpha"])
-        data["MagneticFieldRef"] = int(self._setup["Controls"]["Bdot"]["MagneticFieldRef"])
+        data["MagneticFieldRef"] = int(
+            self._setup["Controls"]["Bdot"]["MagneticFieldRef"])
         data["Beta"] = float(self._setup["Controls"]["Bdot"]["Beta"])
-        data = self._check_for_additional_keys_in_section(self._setup["Controls"]["Bdot"], data)
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Controls"]["Bdot"], data)
         return data
 
     @property
@@ -315,8 +333,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["Task"] = str(self._setup["Controls"]["Bcross"]["Task"])
-        data["PointingAxis"] = np.array(self._setup["Controls"]["Bcross"]["PointingAxis"])
-        data = self._check_for_additional_keys_in_section(self._setup["Controls"]["Bcross"], data)
+        data["PointingAxis"] = np.array(
+            self._setup["Controls"]["Bcross"]["PointingAxis"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Controls"]["Bcross"], data)
         return data
 
     @property
@@ -332,8 +352,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         data = dict()
         data["AlignGain"] = float(self._setup["Controls"]["Bcross"]["AlignGain"])
-        data["ProportionalGain"] = float(self._setup["Controls"]["Bcross"]["ProportionalGain"])
-        data = self._check_for_additional_keys_in_section(self._setup["Controls"]["Bcross"], data)
+        data["ProportionalGain"] = float(
+            self._setup["Controls"]["Bcross"]["ProportionalGain"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Controls"]["Bcross"], data)
         return data
 
     @property
@@ -359,12 +381,18 @@ class SimulationSetupReader(SimulationSetup):
             int: pointing dwell time (s).
         """
         data = dict()
-        data["DetumblingOff"] = float(self._setup["Controls"]["ModeManagement"]["DetumblingOff"])
-        data["DetumblingOn"] = float(self._setup["Controls"]["ModeManagement"]["DetumblingOn"])
-        data["PointingOff"] = float(self._setup["Controls"]["ModeManagement"]["PointingOff"])
-        data["PointingOn"] = float(self._setup["Controls"]["ModeManagement"]["PointingOn"])
-        data["PointingDwellTime"] = int(self._setup["Controls"]["ModeManagement"]["PointingDwellTime"])
-        data = self._check_for_additional_keys_in_section(self._setup["Controls"]["ModeManagement"], data)
+        data["DetumblingOff"] = float(
+            self._setup["Controls"]["ModeManagement"]["DetumblingOff"])
+        data["DetumblingOn"] = float(
+            self._setup["Controls"]["ModeManagement"]["DetumblingOn"])
+        data["PointingOff"] = float(self._setup["Controls"]
+                                    ["ModeManagement"]["PointingOff"])
+        data["PointingOn"] = float(self._setup["Controls"]
+                                   ["ModeManagement"]["PointingOn"])
+        data["PointingDwellTime"] = int(
+            self._setup["Controls"]["ModeManagement"]["PointingDwellTime"])
+        data = self._check_for_additional_keys_in_section(
+            self._setup["Controls"]["ModeManagement"], data)
         return data
 
     def check_for_unknown_settings(self) -> dict | None:

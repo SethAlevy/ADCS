@@ -10,6 +10,7 @@ import skyfield.api as skyfield
 import core.utilities as ut
 import core.transformations as tr
 from core.state import State
+from core.logger import log, warn
 
 
 class SatelliteImplementation(Satellite):
@@ -580,7 +581,7 @@ class SatelliteImplementation(Satellite):
             self.start_detumbling = False
             self.start_pointing = True
             self._pointing_ok_counter = 0
-            print(
+            log(
                 f"Detumbling stopped (|ω|={ang_vel_norm:.2f} deg/s). Pointing started."
             )
 
@@ -589,7 +590,7 @@ class SatelliteImplementation(Satellite):
             self.start_detumbling = True
             self.start_pointing = False
             self._pointing_ok_counter = 0
-            print(f"Detumbling restarted (|ω|={ang_vel_norm:.2f} deg/s).")
+            log(f"Detumbling restarted (|ω|={ang_vel_norm:.2f} deg/s).")
 
         # 3) Pointing completion: require low angle AND low rate for a while → Idle
         if self.start_pointing:
@@ -600,7 +601,7 @@ class SatelliteImplementation(Satellite):
                 self._pointing_ok_counter = 0
             if self._pointing_ok_counter >= self.pointing_dwell_time:
                 self.start_pointing = False
-                print(f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
+                log(f"Pointing completed → Idle (angle≈{pointing_err:.2f}°).")
 
         # 4) Re-acquire pointing if it drifted after completion (Idle)
         if (
@@ -610,7 +611,7 @@ class SatelliteImplementation(Satellite):
         ):
             self.start_pointing = True
             self._pointing_ok_counter = 0
-            print(f"Pointing re-enabled (drift angle={pointing_err:.1f}°).")
+            log(f"Pointing re-enabled (drift angle={pointing_err:.1f}°).")
 
     def manage_actuators_sensors_timing(self) -> None:
         """

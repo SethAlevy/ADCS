@@ -28,7 +28,7 @@ class MagnetometerImplementation:
                 noise parameters.
         """
         self.noise = setup.magnetometer["Noise"]
-        self.noise_max = setup.magnetometer["NoiseMax"]
+        self.noise_max = setup.magnetometer["AbsoluteNoise"]
 
         # cache of last measurements (set by simulate_magnetometer)
         self.last_sbf_measurement = None
@@ -527,7 +527,7 @@ class SensorFusionImplementation:
                 b_ref = float(setup.b_dot_parameters["MagneticFieldRef"])
             except Exception:
                 b_ref = 45000.0
-        sigma_mag = float(setup.magnetometer["NoiseMax"]) / np.sqrt(12.0)
+        sigma_mag = float(setup.magnetometer["AbsoluteNoise"]) / np.sqrt(12.0)
         sigma_mag = sigma_mag / max(b_ref, 1.0)
         sigma_sun = np.deg2rad(float(setup.sunsensor["AngularNoise"])) / np.sqrt(12.0)
         self.measurement_noise = [sigma_mag, sigma_sun]
