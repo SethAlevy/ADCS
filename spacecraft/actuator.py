@@ -420,11 +420,6 @@ class MagnetorquerImplementation:
         self.omega_prev = np.rad2deg(angular_velocity_rad_s)
         return angular_acceleration_rad_s2
 
-    def get_pointing_error_angle(self, q: np.ndarray) -> float:
-        correction_rotation_object = R.from_quat(q)
-        error_angle_rad = correction_rotation_object.magnitude()
-        return ut.rad_to_degrees(error_angle_rad)
-
     def _shape_dipole(self, m_cmd: np.ndarray, dt: float) -> np.ndarray:
         """
         First-order low-pass toward m_cmd and vector slew limit.

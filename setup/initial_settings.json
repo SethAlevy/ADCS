@@ -50,7 +50,7 @@
         "Magnetometer" :
             {
                 "Noise" : true,
-                "NoiseMax" : 10,
+                "AbsoluteNoise" : 10,
                 "UnitInfo" : "nT"
             },
         "SunSensor" :
