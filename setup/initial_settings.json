@@ -83,7 +83,7 @@
             {
                 "Coils" : 200,
                 "MaxCurrent": 0.2,
-                "RodArea" : 90,
+                "CoilArea" : 90,
                 "SafetyFactor": 0.9,
                 "AlphaCap": 0.5,
                 "UnitInfo" : "coils, cm^2, A, unitless, deg/s2"

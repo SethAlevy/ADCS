@@ -121,7 +121,7 @@ class MatplotlibPlots:
     def __init__(self, output_dir=Path(__file__).resolve().parent,
                  save: bool = True, show: bool = False) -> None:
         """
-        This class handles the creation of plots using matplotlib library. Main 
+        This class handles the creation of plots using matplotlib library. Main
         parameters may be adjusted in PlotConfig dataclass.
 
         Typical usage:
@@ -129,7 +129,7 @@ class MatplotlibPlots:
             mpl.line_plot({"Sine": (x, y)}, "Sine", "t", "sin(t)", "sine_plot")
 
         Args:
-            output_dir (Path, optional): Path where the output plots will be saved. 
+            output_dir (Path, optional): Path where the output plots will be saved.
                 Defaults to the directory of the current file.
             save (bool, optional): Whether to save the plots. Defaults to True.
             show (bool, optional): Whether to display the plots. Defaults to False.
@@ -473,9 +473,12 @@ class MatplotlibPlots:
             + state_vector["angular_velocity_z"].values**2
         )
         series = {
-            "wx": (state_vector.index.values, state_vector["angular_velocity_x"].values),
-            "wy": (state_vector.index.values, state_vector["angular_velocity_y"].values),
-            "wz": (state_vector.index.values, state_vector["angular_velocity_z"].values),
+            "wx": (
+                state_vector.index.values, state_vector["angular_velocity_x"].values),
+            "wy": (
+                state_vector.index.values, state_vector["angular_velocity_y"].values),
+            "wz": (
+                state_vector.index.values, state_vector["angular_velocity_z"].values),
             "|w|": (state_vector.index.values, wmag),
         }
         self.line_plot(
@@ -601,9 +604,12 @@ class MatplotlibPlots:
         Requires: sun_vector_eci_x/y/z columns.
         """
         series = {
-            "ECI X": (state_vector.index.values, state_vector["sun_vector_eci_x"].values),
-            "ECI Y": (state_vector.index.values, state_vector["sun_vector_eci_y"].values),
-            "ECI Z": (state_vector.index.values, state_vector["sun_vector_eci_z"].values),
+            "ECI X": (
+                state_vector.index.values, state_vector["sun_vector_eci_x"].values),
+            "ECI Y": (
+                state_vector.index.values, state_vector["sun_vector_eci_y"].values),
+            "ECI Z": (
+                state_vector.index.values, state_vector["sun_vector_eci_z"].values),
         }
         self.line_plot(
             series=series,
@@ -620,9 +626,12 @@ class MatplotlibPlots:
         Requires: sun_vector_sbf_x/y/z columns.
         """
         series = {
-            "SBF X": (state_vector.index.values, state_vector["sun_vector_sbf_x"].values),
-            "SBF Y": (state_vector.index.values, state_vector["sun_vector_sbf_y"].values),
-            "SBF Z": (state_vector.index.values, state_vector["sun_vector_sbf_z"].values),
+            "SBF X": (
+                state_vector.index.values, state_vector["sun_vector_sbf_x"].values),
+            "SBF Y": (
+                state_vector.index.values, state_vector["sun_vector_sbf_y"].values),
+            "SBF Z": (
+                state_vector.index.values, state_vector["sun_vector_sbf_z"].values),
         }
         self.line_plot(
             series=series,
@@ -668,7 +677,13 @@ class PlotlyPlots:
         - Methods return None when show=True to avoid duplicate notebook rendering.
     """
 
-    def __init__(self, output_dir: Path | None = None, save: bool = False, show: bool = False, renderer: str | None = None) -> None:
+    def __init__(
+        self,
+        output_dir: Path | None = None,
+        save: bool = False,
+        show: bool = False,
+        renderer: str | None = None
+    ) -> None:
         """
         Initialize Plotly plot helper.
 
@@ -741,10 +756,10 @@ class PlotlyPlots:
             legend: If True, display legend.
         """
         fig = go.Figure()
-        items = [(xy[0], xy[1], label)] if isinstance(series, tuple) else (
-            [(xy[0], xy[1], label)
-             for label, xy in series.items()] if isinstance(series, dict) else series
-        )
+        if isinstance(series, dict):
+            items = [(xy[0], xy[1], label) for label, xy in series.items()]
+        else:
+            items = series
         for x, y, label in items:
             fig.add_scatter(x=x, y=y, mode="lines", name=label)
         fig.update_layout(title=title, xaxis_title=xlabel,
@@ -777,10 +792,10 @@ class PlotlyPlots:
             legend: If True, display legend.
         """
         fig = go.Figure()
-        items = [(xy[0], xy[1], label)] if isinstance(series, tuple) else (
-            [(xy[0], xy[1], label)
-             for label, xy in series.items()] if isinstance(series, dict) else series
-        )
+        if isinstance(series, dict):
+            items = [(xy[0], xy[1], label) for label, xy in series.items()]
+        else:
+            items = series
         for x, y, label in items:
             fig.add_scatter(x=x, y=y, mode=mode, name=label)
         fig.update_layout(title=title, xaxis_title=xlabel,
@@ -837,8 +852,10 @@ class PlotlyPlots:
         Plotly 3D orbit with optional spherical body surface.
 
         Args:
-            positions_km: Nx3 array of positions in km (GCRS/ECEF). If None/empty, only sphere is drawn.
-            planet_radius_km: Planet radius in km. If provided, a semi-transparent surface is added.
+            positions_km: Nx3 array of positions in km (GCRS/ECEF). If None/empty,
+                only sphere is drawn.
+            planet_radius_km: Planet radius in km. If provided, a semi-transparent
+                surface is added.
             filename: Base output filename without extension.
             title: Plot title.
             orbit_color: Color for the orbit trace.
@@ -848,10 +865,16 @@ class PlotlyPlots:
         """
         fig = go.Figure()
         if positions_km is not None and positions_km.size:
-            fig.add_trace(go.Scatter3d(
-                x=positions_km[:, 0], y=positions_km[:, 1], z=positions_km[:, 2],
-                mode="lines", line=dict(width=4, color=orbit_color), name="Orbit"
-            ))
+            fig.add_trace(
+                go.Scatter3d(
+                    x=positions_km[:, 0],
+                    y=positions_km[:, 1],
+                    z=positions_km[:, 2],
+                    mode="lines",
+                    line=dict(width=4, color=orbit_color),
+                    name="Orbit"
+                )
+            )
         # Optional sphere
         if planet_radius_km and planet_radius_km > 0:
             u = np.linspace(0, 2*np.pi, sphere_res_u)
@@ -860,8 +883,15 @@ class PlotlyPlots:
             xs = planet_radius_km * np.cos(uu) * np.sin(vv)
             ys = planet_radius_km * np.sin(uu) * np.sin(vv)
             zs = planet_radius_km * np.cos(vv)
-            fig.add_surface(x=xs, y=ys, z=zs, showscale=False, opacity=0.25, colorscale=[
-                            [0, sphere_color], [1, sphere_color]], name="Surface")
+            fig.add_surface(
+                x=xs,
+                y=ys,
+                z=zs,
+                showscale=False,
+                opacity=0.25,
+                colorscale=[[0, sphere_color], [1, sphere_color]],
+                name="Surface"
+            )
         fig.update_layout(
             title=title,
             scene=dict(
@@ -874,7 +904,11 @@ class PlotlyPlots:
 
     # High-level plots using the templates
 
-    def plot_orbit(self, df: pd.DataFrame, planet_radius_km: float | None = None) -> go.Figure | None:
+    def plot_orbit(
+        self,
+        df: pd.DataFrame,
+        planet_radius_km: float | None = None
+    ) -> go.Figure | None:
         """
         High-level orbit plot from a state DataFrame with position columns.
 
@@ -886,7 +920,12 @@ class PlotlyPlots:
         positions = None
         if all(c in df for c in pos_cols):
             positions = np.column_stack([df[c].values for c in pos_cols])
-        return self.orbit_3d_plot(positions, planet_radius_km, filename="orbit_plotly", title="Orbit GCRS (ECEF)")
+        return self.orbit_3d_plot(
+            positions,
+            planet_radius_km,
+            filename="orbit_plotly",
+            title="Orbit GCRS (ECEF)"
+        )
 
     def plot_position(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -901,7 +940,13 @@ class PlotlyPlots:
             "position_z": (x, df["position_z"].values) if "position_z" in df else None,
         }
         series = {k: v for k, v in series.items() if v is not None}
-        return self.line_plot(series, "Satellite Position in GCRS", "Time (s)", "Position (km)", "position_GCRS_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Position in GCRS",
+            "Time (s)",
+            "Position (km)",
+            "position_GCRS_plotly"
+        )
 
     def plot_lla(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -918,7 +963,14 @@ class PlotlyPlots:
         secondary = {}
         if "altitude" in df:
             secondary["Altitude"] = (x, df["altitude"].values)
-        return self.twin_axis_line_plot(primary, secondary, "Satellite Position in LLA", "Time (s)", "Latitude/Longitude (deg)", "Altitude (km)", "lla_plotly")
+        return self.twin_axis_line_plot(
+            primary, secondary,
+            "Satellite Position in LLA",
+            "Time (s)",
+            "Latitude/Longitude (deg)",
+            "Altitude (km)",
+            "lla_plotly"
+        )
 
     def plot_magnetic_field_sbf(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -934,7 +986,13 @@ class PlotlyPlots:
             series["SBF Y"] = (x, df["magnetic_field_sbf_y"].values)
         if "magnetic_field_sbf_z" in df:
             series["SBF Z"] = (x, df["magnetic_field_sbf_z"].values)
-        return self.line_plot(series, "Satellite Magnetic Field in SBF", "Time (s)", "Magnetic Field (nT)", "magnetic_field_sbf_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Magnetic Field in SBF",
+            "Time (s)",
+            "Magnetic Field (nT)",
+            "magnetic_field_sbf_plotly"
+        )
 
     def plot_magnetic_field_eci(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -950,7 +1008,13 @@ class PlotlyPlots:
             series["ECI Y"] = (x, df["magnetic_field_eci_y"].values)
         if "magnetic_field_eci_z" in df:
             series["ECI Z"] = (x, df["magnetic_field_eci_z"].values)
-        return self.line_plot(series, "Satellite Magnetic Field in ECI", "Time (s)", "Magnetic Field (nT)", "magnetic_field_eci_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Magnetic Field in ECI",
+            "Time (s)",
+            "Magnetic Field (nT)",
+            "magnetic_field_eci_plotly"
+        )
 
     def plot_angular_velocity(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -959,17 +1023,23 @@ class PlotlyPlots:
         Requires: angular_velocity_x/y/z columns.
         """
         x = df.index.values
-        series = {}
         cols = ["angular_velocity_x", "angular_velocity_y", "angular_velocity_z"]
         labels = ["wx", "wy", "wz"]
-        for c, l in zip(cols, labels):
-            if c in df:
-                series[l] = (x, df[c].values)
+        series = {l: (x, df[c].values) for c, l in zip(cols, labels) if c in df}
         if all(c in df for c in cols):
-            wmag = np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2).values if hasattr(
-                df[cols[0]], "values") else np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2)
+            wmag = np.sqrt(
+                df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2
+            ).values if hasattr(df[cols[0]], "values") else np.sqrt(
+                df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2
+            )
             series["|w|"] = (x, wmag)
-        return self.line_plot(series, "Satellite Angular Velocity", "Time (s)", "deg/s", "angular_velocity_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Angular Velocity",
+            "Time (s)",
+            "deg/s",
+            "angular_velocity_plotly"
+        )
 
     def plot_euler_angles(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -985,7 +1055,13 @@ class PlotlyPlots:
             series["pitch (Theta)"] = (x, df["euler_angles_y1"].values)
         if "euler_angles_z1" in df:
             series["yaw (Psi)"] = (x, df["euler_angles_z1"].values)
-        return self.line_plot(series, "Satellite Euler Angles", "Time (s)", "deg", "euler_angles_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Euler Angles",
+            "Time (s)",
+            "deg",
+            "euler_angles_plotly"
+        )
 
     def plot_torque(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -994,17 +1070,23 @@ class PlotlyPlots:
         Requires: torque_x/y/z columns.
         """
         x = df.index.values
-        series = {}
         cols = ["torque_x", "torque_y", "torque_z"]
         labels = ["Torque X", "Torque Y", "Torque Z"]
-        for c, l in zip(cols, labels):
-            if c in df:
-                series[l] = (x, df[c].values)
+        series = {l: (x, df[c].values) for c, l in zip(cols, labels) if c in df}
         if all(c in df for c in cols):
-            tmag = np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2).values if hasattr(
-                df[cols[0]], "values") else np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2)
+            tmag = np.sqrt(
+                df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2
+            ).values if hasattr(df[cols[0]], "values") else np.sqrt(
+                df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2
+            )
             series["|Torque|"] = (x, tmag)
-        return self.line_plot(series, "Magnetorquer Applied Torque", "Time (s)", "N·m", "torque_plotly")
+        return self.line_plot(
+            series,
+            "Magnetorquer Applied Torque",
+            "Time (s)",
+            "N·m",
+            "torque_plotly"
+        )
 
     def plot_angular_acceleration(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -1021,12 +1103,23 @@ class PlotlyPlots:
         if "angular_acceleration_z" in df:
             series["Alpha Z"] = (x, df["angular_acceleration_z"].values)
         # Magnitude only if all components exist
-        cols = ["angular_acceleration_x",
-                "angular_acceleration_y", "angular_acceleration_z"]
+        cols = [
+            "angular_acceleration_x",
+            "angular_acceleration_y",
+            "angular_acceleration_z"
+        ]
         if all(c in df for c in cols):
-            amag = np.sqrt(df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2).values
+            amag = np.sqrt(
+                df[cols[0]]**2 + df[cols[1]]**2 + df[cols[2]]**2
+            ).values
             series["|Alpha|"] = (x, amag)
-        return self.line_plot(series, "Satellite Angular Acceleration", "Time (s)", "deg/s²", "angular_acceleration_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Angular Acceleration",
+            "Time (s)",
+            "deg/s²",
+            "angular_acceleration_plotly"
+        )
 
     def plot_pointing_error(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -1038,7 +1131,14 @@ class PlotlyPlots:
         series = {}
         if "pointing_error" in df:
             series["Pointing Error"] = (x, df["pointing_error"].values)
-        return self.scatter_plot(series, "Satellite Pointing Error", "Time (s)", "deg", "pointing_error_plotly", mode="markers")
+        return self.scatter_plot(
+            series,
+            "Satellite Pointing Error",
+            "Time (s)",
+            "deg",
+            "pointing_error_plotly",
+            mode="markers"
+        )
 
     def plot_sun_vector_eci(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -1054,7 +1154,13 @@ class PlotlyPlots:
             series["ECI Y"] = (x, df["sun_vector_eci_y"].values)
         if "sun_vector_eci_z" in df:
             series["ECI Z"] = (x, df["sun_vector_eci_z"].values)
-        return self.line_plot(series, "Satellite Sun Vector in ECI", "Time (s)", "Sun Vector (ECI)", "sun_vector_eci_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Sun Vector in ECI",
+            "Time (s)",
+            "Sun Vector (ECI)",
+            "sun_vector_eci_plotly"
+        )
 
     def plot_sun_vector_sbf(self, df: pd.DataFrame) -> go.Figure | None:
         """
@@ -1070,7 +1176,13 @@ class PlotlyPlots:
             series["SBF Y"] = (x, df["sun_vector_sbf_y"].values)
         if "sun_vector_sbf_z" in df:
             series["SBF Z"] = (x, df["sun_vector_sbf_z"].values)
-        return self.line_plot(series, "Satellite Sun Vector in SBF", "Time (s)", "Sun Vector (SBF)", "sun_vector_sbf_plotly")
+        return self.line_plot(
+            series,
+            "Satellite Sun Vector in SBF",
+            "Time (s)",
+            "Sun Vector (SBF)",
+            "sun_vector_sbf_plotly"
+        )
 
     def basic_plots(self, df: pd.DataFrame, setup=None) -> None:
         """
@@ -1080,8 +1192,11 @@ class PlotlyPlots:
             df: State DataFrame containing time-indexed telemetry.
             setup: Optional setup object used to fetch planet radius for orbit plot.
         """
-        self.plot_orbit(df, getattr(setup, "planet_data", {}
-                                    ).get("R", None) if setup else None)
+        planet_radius = None
+        if setup:
+            planet_data = getattr(setup, "planet_data", {})
+            planet_radius = planet_data.get("R", None)
+        self.plot_orbit(df, planet_radius)
         self.plot_position(df)
         self.plot_lla(df)
         self.plot_magnetic_field_sbf(df)
@@ -1101,9 +1216,16 @@ class LivePlotlyLine:
     Call update(t, ys) inside your loop; display appears automatically in notebooks.
     """
 
-    def __init__(self, labels: list[str], title: str, xlabel: str, ylabel: str,
-                 window: float | None = None, max_points: int = 10000,
-                 output_dir: Path | None = None):
+    def __init__(
+        self,
+        labels: list[str],
+        title: str,
+        xlabel: str,
+        ylabel: str,
+        window: float | None = None,
+        max_points: int = 10000,
+        output_dir: Path | None = None
+    ):
         """
         Initialize a live-updating FigureWidget with multiple series.
 
@@ -1121,13 +1243,19 @@ class LivePlotlyLine:
         self.window = window
         self.max_points = max_points
         # where to save HTML by default
-        self.output_dir = (output_dir or (Path(__file__).resolve().parent / "plots"))
+        self.output_dir = (
+            output_dir or (Path(__file__).resolve().parent / "plots")
+        )
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._xs: list[float] = []
         self._ys: list[list[float]] = [[] for _ in labels]
         for lbl in labels:
             self.fig.add_scatter(mode="lines", name=lbl)
-        self.fig.update_layout(title=title, xaxis_title=xlabel, yaxis_title=ylabel)
+        self.fig.update_layout(
+            title=title,
+            xaxis_title=xlabel,
+            yaxis_title=ylabel
+        )
         try:
             from IPython.display import display
             display(self.fig)
@@ -1142,7 +1270,7 @@ class LivePlotlyLine:
             t: New X value (e.g., time in seconds).
             ys: Iterable of Y values, one per series defined at construction.
         """
-        self._xs.append(float(t))
+        self._xs.append(t)
         for i, v in enumerate(ys):
             self._ys[i].append(float(v))
         # enforce max_points
