@@ -1,7 +1,7 @@
 [project]
 name = "adcs"
 version = "0.1.0"
-description = ""
+description = "Small Satellite ADCS Simulation"
 authors = [
     {name = "Arkadiusz Drabik", email = "arek.drabik1453@gmail.com"}
 ]
@@ -25,9 +25,6 @@ dependencies = [
     "anywidget==0.9.21",
     "mkdocs-bootswatch==1.1"
 ]
-
-[tool.poetry]
-packages = [{include = "adcs", from = "src"}]
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "6.29.5"
