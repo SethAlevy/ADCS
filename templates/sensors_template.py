@@ -1,14 +1,12 @@
 import numpy as np
-from abc import ABC
-from abc import abstractmethod
 import skyfield.api as skyfield
+from abc import ABC, abstractmethod
 from templates.satellite_template import Satellite
-import datetime as dt
 
 
 class Magnetometer(ABC):
     """
-    Abstract base class for magnetometer sensors.
+     Abstract base class for magnetometers.
 
     Initialize the Magnetometer class. It is responsible for calculating the
     Earth's magnetic field vector at a given satellite position and time using the
@@ -18,47 +16,51 @@ class Magnetometer(ABC):
     """
 
     @abstractmethod
-    def get_magnetic_field(self, satellite: Satellite, date: dt.datetime) -> np.ndarray:
+    def get_magnetic_field(
+        self,
+        satellite: Satellite,
+        julian_date: skyfield.Time
+    ) -> np.ndarray:
         """
-        Get the magnetic field vector at a given satellite position and date.
-        This method uses the ppigrf library to compute the magnetic field
-        vector in the East-North-Up (ENU) reference frame in nT.
+        Get the magnetic field vector at the satellite's position and given time.
+        Magnetic field model is taken from the IGRF via pyIGRF library. Originally it is
+        in NED (North-East-Down) frame and in nT (nanoTesla) thus a transformation is
+        needed to convert it to ECEF and then to ECI frame.
 
         Args:
-            satellite (Satellite): The satellite object containing
-            the TLE data and current status.
-            date (dt.datetime): time object representing the date and time
-            for which the magnetic field vector is to be computed.
+            satellite (Satellite): The satellite object containing the TLE data and
+                current status.
+            julian_date (skyfield.Time): Julian date for which the magnetic field vector
+                is to be computed.
 
         Returns:
-            np.ndarray: vector containing the magnetic field components
-            in the East-North-Up (ENU) reference frame.
+            np.ndarray: Magnetic field vector in NED frame in nT (nanoTesla).
         """
         pass
 
     @abstractmethod
     def simulate_magnetometer(
         self,
-        satellite: object,
+        satellite: Satellite,
         julian_date: skyfield.Time,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Simulate the magnetometer readings. This method computes the
-        magnetic field vector at a given satellite and date, optionally adds
+        magnetic field vector at a given position and date, optionally adds
         noise and transforms it to the Satellite Body Frame (SBF) and Earth
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
         Args:
-            satellite (object): The satellite object containing the TLE data and current
-                status.
+            satellite (Satellite): The satellite object containing the TLE data and
+            current status.
             julian_date (skyfield.Time): Julian date for which the magnetic field vector
                 is to be computed.
 
         Returns:
-        np.ndarray: Simulated magnetic field vectors in the Satellite Body Frame
-        (SBF) and Earth-Centered Inertial (ECI) frame. Returned in nT (nanoTesla).
-        The first three elements are in the SBF frame, and the next three are in
-        the ECI frame.
+            tuple[np.ndarray, np.ndarray]: Simulated magnetic field vectors in the
+                Satellite Body Frame (SBF) and Earth-Centered Inertial (ECI) frame.
+                Returned in nT (nanoTesla). The first three elements are in the SBF
+                frame, and the next three are in the ECI frame.
         """
         pass
 
@@ -77,14 +79,14 @@ class Sunsensor(ABC):
     @abstractmethod
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
         """
-        Compute Sun's position in ECI (ICRF) using Skyfield as seen from Earth.
+        Compute Sun's position in ICRF using Skyfield as seen from Earth (ECI).
 
         Args:
             julian_date (skyfield.Time): Julian date for which to compute the Sun's
-            position.
+                position.
 
         Returns:
-            numpy.ndarray: [x, y, z] in kilometers in ECI (ICRF) frame
+            numpy.ndarray: [x, y, z] in kilometers in ICRF (ECI) frame
         """
         pass
 
@@ -122,23 +124,23 @@ class SensorFusion(ABC):
 
     @abstractmethod
     def triad(
-        self, v1_i: np.ndarray, v2_i: np.ndarray, v1_b: np.ndarray, v2_b: np.ndarray
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> np.ndarray:
         """
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
         of two sensors. It is a basic and simple algorithm used in aerospace. This
         method computes a rotation matrix from inertial to body frame using two
-        vectors in both frames (SBF, ECI) and constructing a triad from them. The
-        first vector is typically the more accurate measurement.
+        vectors in both frames (SBF, ECI). The resulting rotation is a relative
+        transformation between two orthogonal triads (coordinate systems created
+        based on the given vectors) that represent different frames. The first vector
+        is typically the more accurate measurement.
 
         Useful links:
         https://www.aero.iitb.ac.in/satelliteWiki/index.php/Triad_Algorithm
 
         Args:
-            v1_i (np.ndarray): First vector in inertial frame.
-            v2_i (np.ndarray): Second vector in inertial frame.
-            v1_b (np.ndarray): First vector in body frame.
-            v2_b (np.ndarray): Second vector in body frame.
+            v_b_list (list of np.ndarray): Body frame vectors.
+            v_i_list (list of np.ndarray): Inertial frame vectors.
 
         Returns:
             np.ndarray: quaternion representing the rotation from inertial to body
@@ -153,7 +155,7 @@ class SensorFusion(ABC):
         """
         QUEST (QUaternion ESTimator) algorithm for optimal attitude estimation of at
         least two sensors. The algorithm solves the Wahba problem by finding the
-        a solution (rotation matrix) that minimizes the error between a set of
+        solution (rotation matrix) that minimizes the error between a set of
         weighted vectors in the body frame and their corresponding vectors in the
         inertial frame. It can take more measurements than TRIAD, and it is more
         robust to noise and outliers giving a more accurate estimate.
@@ -163,8 +165,8 @@ class SensorFusion(ABC):
         https://en.wikipedia.org/wiki/Wahba%27s_problem
 
         Args:
-            v_b_list (list of np.ndarray): Body frame unit vectors.
-            v_i_list (list of np.ndarray): Inertial frame unit vectors.
+            v_b_list (list of np.ndarray): Body frame vectors.
+            v_i_list (list of np.ndarray): Inertial frame vectors.
 
         Returns:
             np.ndarray: Quaternion [x, y, z, w] estimating attitude (ECI to body).
@@ -184,14 +186,15 @@ class SensorFusion(ABC):
         Extended Kalman Filter (EKF) for attitude estimation based on
         gyroscope measurements and at least two vector measurements. It is a recursive
         algorithm (updates over time) that combines the gyroscope data (angular
-        velocity) with the vector measurements. The algorithm consists of two steps:
-        prediction and update. The prediction is based on angular velocity, while the
-        update incorporates the vector measurements. Compared to QUEST, EKF
-        can handle noisy measurements and biases giving a comprehensive and
-        accurate estimate.
+        velocity) with the vector measurements (magnetic field and sun vector). The
+        algorithm consists of two steps: prediction and update. The prediction is based
+        on angular velocity, while the update incorporates the vector measurements.
+        Compared to QUEST, EKF can handle noisy measurements and biases giving a
+        comprehensive and accurate estimate.
 
         Useful links:
         https://medium.com/@sasha_przybylski/the-math-behind-extended-kalman-filtering-0df981a87453
+        https://automaticaddison.com/extended-kalman-filter-ekf-with-python-code-example/
 
         Args:
             v_b_list (list of np.ndarray): Body frame unit vectors.

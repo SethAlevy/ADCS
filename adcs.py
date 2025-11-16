@@ -10,7 +10,7 @@ from spacecraft.sensors import (
     SunsensorImplementation,
     SensorFusionImplementation,
 )
-from visualziations.visualizations import MatplotlibPlots, PlotlyPlots
+from visualizations.visualizations import MatplotlibPlots, PlotlyPlots
 
 import argparse
 from pathlib import Path

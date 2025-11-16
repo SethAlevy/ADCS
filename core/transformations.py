@@ -55,14 +55,18 @@ def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarr
 def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib) -> np.ndarray:
     """
     Convert a vector from ECEF (Earth-Centered, Earth-Fixed) to ECI
-    (Earth-Centered Inertial) frame.
+    (Earth-Centered Inertial) frame using Greenwich apparent sidereal time.
+
+    Note:
+        This is a simplified rotation about Z by GAST. For precise ITRF↔GCRS
+        transformations consider full precession–nutation and EOP models.
 
     Args:
         ecef_vec (np.ndarray): Vector in ECEF frame.
         time (skyfield.timelib): Skyfield Time object (UTC or TT).
 
     Returns:
-        np.ndarray: Vector in ECI frame.
+        np.ndarray: Vector in ECI/GCRS-like frame.
     """
     # Get GAST (Greenwich Apparent Sidereal Time) in radians
     gast_rad = time.gast * np.pi / 12  # GAST in hours, convert to radians
@@ -285,8 +289,8 @@ def sun_direction_body(
 ) -> np.ndarray:
     """
     Return unit vector in body frame pointing toward the Sun.
-    sun_vector_eci: Sun direction (or position difference) in ECI frame.
-                    (Only direction is used; it will be normalized.)
+    sun_vector_eci: Sun direction (or position difference) in ICRF/ECI frame
+                    (only direction is used; it will be normalized).
     quat_sb_from_eci: Quaternion rotating ECI -> body [x, y, z, w].
 
     Returns:

@@ -1,6 +1,5 @@
 import numpy as np
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from setup.two_line_element import TwoLineElement
 
 
@@ -16,7 +15,7 @@ class Satellite(ABC):
 
         Args:
             iteration (int): The current iteration of the simulation.
-            Equals the time in seconds from its start.
+                Equals the time in seconds from its start.
         """
         pass
 
@@ -50,10 +49,10 @@ class Satellite(ABC):
     def position(self) -> np.ndarray:
         """
         Position of the satellite obtained using the skyfield library.
-        By default returns GCRS (Geocentric Celestial Reference System)
-        which is an ECI (Earth-Centered Inertial) frame (fixed to the stars)
-        almost similar to J2000 frame. Distance is given in km and calculated
-        for the given simulation time.
+        Skyfield returns a geocentric position in GCRS (an inertial frame
+        aligned with ICRF near J2000). Distance is given in km and calculated
+        for the given simulation time. If using raw SGP4/TEME, explicit
+        transforms to ITRF/ECEF are required for geodetic products.
 
         Returns:
             np.ndarray: X, Y and Z position of the satellite in km for current
@@ -140,7 +139,7 @@ class Satellite(ABC):
 
         Returns:
             np.ndarray: Updated Euler angles of the satellite in degrees
-            (roll, pitch and yaw).
+                (roll, pitch and yaw).
         """
         pass
 
@@ -155,6 +154,10 @@ class Satellite(ABC):
         The vector part can be interpreted as a rotation axis and the scalar
         part represents the angle of rotation around that axis.
 
+        Useful link:
+        https://probablydance.com/2017/08/05/intuitive-quaternions/
+        https://quaternions.online/
+
         Returns:
             np.ndarray: a 4-element array in the form of [x, y, z, w].
         """
@@ -165,8 +168,11 @@ class Satellite(ABC):
     def two_line_element(self) -> TwoLineElement:
         """
         Two-line element set (TLE) of the satellite. Imported from file
-        as object. Allows to access the parameters descrbing the satellite's
+        as object. Allows to access the parameters describing the satellite's
         orbital parameters such as inclination, right ascension etc.
+
+        Returns:
+            TwoLineElement: TLE object containing the orbital parameters.
         """
         pass
 
@@ -190,8 +196,8 @@ class Satellite(ABC):
     @abstractmethod
     def sun_vector(self) -> np.ndarray:
         """
-        Get the Sun vector as observed from Earth. Due to the large distance
-        the altitude is neglected. Only a rotation from ECI to SBF is applied.
+        Get the Sun vector as observed from Earth. The vector is computed in
+        ICRF and rotated to SBF; parallax due to satellite altitude is neglected.
 
         Returns:
             np.ndarray: Sun vector in the SBF and ECI frames in form of
@@ -200,11 +206,12 @@ class Satellite(ABC):
         pass
 
     @property
+    @abstractmethod
     def pointing_error_angle(self) -> np.ndarray:
         """
-        Get the pointing error angle in degrees. This is the angle between the
-        vector that the satellite is aligned to and the Earth vector in ECI frame.
-        Initialized as 0.0 and updated after pointing was launched.
+        Angle (deg) between the selected body axis (PointingAxis) and the target
+        direction vector (Earth or Sun) computed in the body frame. Initialized
+        as 0.0 and updated after pointing was launched.
 
         Returns:
             np.ndarray: Pointing error angle in degrees.
@@ -212,6 +219,7 @@ class Satellite(ABC):
         pass
 
     @property
+    @abstractmethod
     def torque(self) -> np.ndarray:
         """
         Get the torque applied by the magnetorquers in Nm. Initialized as
@@ -223,6 +231,7 @@ class Satellite(ABC):
         pass
 
     @property
+    @abstractmethod
     def angular_acceleration(self) -> np.ndarray:
         """
         Get the angular acceleration of the satellite in rad/s^2. Initialized as
@@ -244,7 +253,7 @@ class Satellite(ABC):
 
     @abstractmethod
     def apply_triad(
-        self, v1_i: np.ndarray, v2_i: np.ndarray, v1_b: np.ndarray, v2_b: np.ndarray
+        self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
     ) -> None:
         """
         Apply the TRIAD algorithm for attitude determination of two sensors.
@@ -254,10 +263,8 @@ class Satellite(ABC):
         computations.
 
         Args:
-            v1_i (np.ndarray): First vector in inertial frame.
-            v2_i (np.ndarray): Second vector in inertial frame.
-            v1_b (np.ndarray): First vector in body frame.
-            v2_b (np.ndarray): Second vector in body frame.
+            v_b_list (list[np.ndarray]): list with vectors in body frame.
+            v_i_list (list[np.ndarray]): list with vectors in inertial frame.
         """
         pass
 
@@ -283,6 +290,8 @@ class Satellite(ABC):
         self,
         v_b_list: list[np.ndarray],
         v_i_list: list[np.ndarray],
+        quaternion_prev: np.ndarray,
+        timestemp: float = 1.0,
     ) -> None:
         """
         Apply the Extended Kalman Filter (EKF) for attitude estimation of at
@@ -293,7 +302,10 @@ class Satellite(ABC):
         computations.
 
         Args:
-            v_b_list (list[np.ndarray]): Body-frame unit vectors.
-            v_i_list (list[np.ndarray]): Inertial-frame unit vectors.
+            v_b_list (list[np.ndarray]): list with vectors in body frame.
+            v_i_list (list[np.ndarray]): list with vectors in inertial frame.
+            quaternion_prev (np.ndarray): Previous quaternion estimate.
+            timestemp (float): Time step between the previous and current estimate
+                in seconds. Default is 1.0 second.
         """
         pass

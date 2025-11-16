@@ -1,8 +1,7 @@
-import pandas as pd
 import numpy as np
 import skyfield.api as skyfield
 from templates.satellite_template import Satellite
-from core.logger import log, warn
+from core.logger import log
 
 
 def time_julian_date(satellite: Satellite) -> skyfield.Time:
@@ -189,13 +188,13 @@ def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray
     """
     Uniformly scale 'vector' so that its L2 norm <= cap.
     - Returns zeros if cap <= 0 or cap is not finite.
-    - Handles lists/tuples/ndarrays.
+    - Handles lists/tuples/ndarray.
     - Copies output to avoid aliasing the input.
 
     Args:
         vector (np.ndarray): Input vector.
         cap (float): Maximum allowed norm.
-        eps (float, optional): Small value to prevent division by zero. Defaults to 1e-12.
+        eps (float, optional): Small value to prevent division by zero.
 
     Returns:
         np.ndarray: Vector with limited norm.
@@ -207,18 +206,14 @@ def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray
 
     # guard cap
     try:
-        c = float(cap)
+        c = cap
     except Exception:
         c = np.nan
     if not np.isfinite(c) or c <= 0.0:
         return np.zeros_like(v)
 
     n = float(np.linalg.norm(v))
-    if not np.isfinite(n) or n <= c:
-        return v.copy()
-
-    scale = c / max(n, eps)
-    return v * scale
+    return v.copy() if not np.isfinite(n) or n <= c else v * (c / max(n, eps))
 
 
 def calculate_pointing_error(
@@ -257,6 +252,6 @@ def log_init_state(setup) -> None:
     log("Initial attitude (Euler angles): %s deg", setup.euler_angles)
     log("Selected sensor fusion algorithm: %s", setup.sensor_fusion_algorithm)
     log("Magnetometer noise: %s nT", setup.magnetometer["AbsoluteNoise"])
-    log("Sunsensor noise: %s degrees", setup.sunsensor["AngularNoise"])
+    log("Sunsensor noise: %s deg", setup.sunsensor["AngularNoise"])
     log("Sensor on time: %s seconds, actuator on time: %s seconds \n",
         setup.sensors_on_time, setup.actuators_on_time)

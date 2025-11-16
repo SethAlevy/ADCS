@@ -1,10 +1,9 @@
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 
 class TwoLineElement(ABC):
     """
-    Abstract class for two-line elements (TLE).
+    Class for reading two-line elements (TLE) from a file.
     """
 
     @property
@@ -31,13 +30,12 @@ class TwoLineElement(ABC):
 
     @property
     @abstractmethod
-    def satellite_name(self) -> int:
+    def satellite_name(self) -> str:
         """
-        Name of the satellite (Satellite Catalog Number) is a 9-digit number
-        assigned to each satellite by the United States Space Command (USSC).
+        Name of the satellite (Satellite Catalog Number).
 
         Returns:
-            int: 9-digit number.
+            str: 5-digit number.
         """
         pass
 
@@ -134,14 +132,14 @@ class TwoLineElement(ABC):
 
     @property
     @abstractmethod
-    def bstar_drag(self) -> float:
+    def bstar_drag(self) -> str:
         """
         BSTAR is a way of modeling satellite aerodynamic drag used in the
         SGP4 model. The drag term is also known as the radiation pressure
         coefficient.
 
         Returns:
-            float: BSTAR drag term.
+            str: BSTAR drag term slice.
         """
         pass
 

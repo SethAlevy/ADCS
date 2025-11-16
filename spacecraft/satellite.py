@@ -10,7 +10,7 @@ import skyfield.api as skyfield
 import core.utilities as ut
 import core.transformations as tr
 from core.state import State
-from core.logger import log, warn
+from core.logger import log
 
 
 class SatelliteImplementation(Satellite):
@@ -93,7 +93,6 @@ class SatelliteImplementation(Satellite):
 
         self.magnetorquer = MagnetorquerImplementation(self.setup, self)
 
-
         # Set the detumbling/pointing management parameters and initialize the
         # starting values and mode
 
@@ -147,10 +146,10 @@ class SatelliteImplementation(Satellite):
     def position(self) -> np.ndarray:
         """
         Position of the satellite obtained using the skyfield library.
-        By default returns GCRS (Geocentric Celestial Reference System)
-        which is an ECI (Earth-Centered Inertial) frame (fixed to the stars)
-        almost similar to J2000 frame. Distance is given in km and calculated
-        for the given simulation time.
+        Skyfield returns a geocentric position in GCRS (an inertial frame
+        aligned with ICRF near J2000). Distance is given in km and calculated
+        for the given simulation time. If using raw SGP4/TEME, explicit
+        transforms to ITRF/ECEF are required for geodetic products.
 
         Returns:
             np.ndarray: X, Y and Z position of the satellite in km for current
@@ -319,8 +318,8 @@ class SatelliteImplementation(Satellite):
     @property
     def sun_vector(self) -> np.ndarray:
         """
-        Get the Sun vector as observed from Earth. Due to the large distance
-        the altitude is neglected. Only a rotation from ECI to SBF is applied.
+        Get the Sun vector as observed from Earth. The vector is computed in
+        ICRF and rotated to SBF; parallax due to satellite altitude is neglected.
 
         Returns:
             np.ndarray: Sun vector in the SBF and ECI frames in form of
@@ -344,9 +343,9 @@ class SatelliteImplementation(Satellite):
     @property
     def pointing_error_angle(self) -> np.ndarray:
         """
-        Get the pointing error angle in degrees. This is the angle between the
-        vector that the satellite is aligned to and the Earth vector in ECI frame.
-        Initialized as 0.0 and updated after pointing was launched.
+        Angle (deg) between the selected body axis (PointingAxis) and the target
+        direction vector (Earth or Sun) computed in the body frame. Initialized
+        as 0.0 and updated after pointing was launched.
 
         Returns:
             np.ndarray: Pointing error angle in degrees.
@@ -414,7 +413,7 @@ class SatelliteImplementation(Satellite):
             v_b_list (list[np.ndarray]): list with vectors in body frame.
             v_i_list (list[np.ndarray]): list with vectors in inertial frame.
         """
-        self._quaternion = self.sensor_fusion.triad(v_i_list, v_b_list)
+        self._quaternion = self.sensor_fusion.triad(v_b_list, v_i_list)
 
     def apply_quest(
         self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]

@@ -56,7 +56,7 @@ class TwoLineElementReader(TwoLineElement):
         Name of the satellite (Satellite Catalog Number).
 
         Returns:
-            str: 9-digit number.
+            str: 5-digit number.
         """
         return self.line_1[2:7]
 
@@ -144,14 +144,14 @@ class TwoLineElementReader(TwoLineElement):
         return float(self.line_1[44:52])
 
     @property
-    def bstar_drag(self) -> float:
+    def bstar_drag(self) -> str:
         """
         BSTAR is a way of modeling satellite aerodynamic drag used in the
         SGP4 model. The drag term is also known as the radiation pressure
         coefficient.
 
         Returns:
-            float: BSTAR drag term.
+            str: BSTAR drag term slice.
         """
         # TODO add conversion to float
         return str(self.line_1[53:61])

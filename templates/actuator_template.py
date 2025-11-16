@@ -1,6 +1,5 @@
 import numpy as np
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 
 class Magnetorquer(ABC):
@@ -12,9 +11,11 @@ class Magnetorquer(ABC):
     def b_dot(
         self,
         magnetic_field: np.ndarray,
-        timestep: float,
-        k: float = 1e-6,
-        safety_factor: float = 0.8,
+        sensing_time: float,
+        adapt_magnetic: bool = False,
+        adapt_angular: bool = False,
+        proportional: bool = False,
+        modified: bool = False,
     ) -> np.ndarray:
         """
         Perform detumbling using the magnetorquer and standard B-dot algorithm.
@@ -28,13 +29,44 @@ class Magnetorquer(ABC):
         https://www.aero.iitb.ac.in/satelliteWiki/index.php/B_Dot_Law
 
         Args:
-            magnetic_field (np.ndarray): The current magnetic field vector.
-            angular_velocity (np.ndarray): The current angular velocity vector.
-            timestep (float): The time step for the simulation.
-            k (float): The gain factor for the control law.
-            safety_factor (float): A factor to limit the current to a safe value.
+            magnetic_field (np.ndarray): The current magnetic field vector in nT.
+            sensing_time (float): Sensor on time used to get the mean derivative
+                from the magnetic field measurements.
+            adapt_magnetic (bool): Whether to adapt the gain based on the magnetic
+                field strength.
+            adapt_angular (bool): Whether to adapt the gain based on the angular
+                velocity to include damping.
+            proportional (bool): Whether to include a proportional term based on
+                the angular velocity.
+            modified (bool): Whether to use the modified B-dot control law that
+                is based directly on the angular velocity (gyroscopes) and
+                magnetic field measurements, instead of magnetic field rate of change.
 
         Returns:
             np.ndarray: The angular acceleration vector to be applied to the satellite.
+        """
+        pass
+
+    @abstractmethod
+    def b_cross(
+        self,
+        magnetic_field_sbf: np.ndarray,
+        align_axis: np.ndarray | list,
+        target_dir_body: np.ndarray,
+    ) -> np.ndarray:
+        """
+        B-cross pointing control (Earth or Sun pointing). Generates angular acceleration 
+        (rad/s^2) based on the error angle. The method combines alignment and damping
+        torques to achieve stable pointing.
+
+        Args:
+            magnetic_field_sbf (np.ndarray): The magnetic field vector in the
+                spacecraft body frame in nT.
+            align_axis (np.ndarray | list): The axis in the body frame to be aligned
+                with the target direction. Specified inside the initial settings json
+                file.
+            target_dir_body (np.ndarray): The target direction vector in the body frame.
+                Calculated based on the specified mode ("earth_pointing" or
+                "sun_pointing").
         """
         pass

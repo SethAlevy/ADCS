@@ -28,7 +28,7 @@ class FakeSatellite:
 class FakeSetup:
     magnetorquer_params = {
         "Coils": 100,
-        "RodArea": 1.0,        # cm^2
+        "CoilArea": 1.0,        # cm^2
         "MaxCurrent": 0.25,    # A
         "SafetyFactor": 0.8,
         "AlphaCap": 0.0,

@@ -74,13 +74,14 @@ class SimulationSetupReader(SimulationSetup):
             int: time step
             int: logging interval
         """
-        data = dict()
-        data["Start"] = int(self._setup["Simulation"]["Iterations"]["Start"])
-        data["Stop"] = int(self._setup["Simulation"]["Iterations"]["Stop"])
-        data["Step"] = int(self._setup["Simulation"]["Iterations"]["Step"])
-        data["LogInterval"] = int(
-            self._setup["Simulation"]["Iterations"]["LogInterval"]
-        )
+        data = {
+            "Start": int(self._setup["Simulation"]["Iterations"]["Start"]),
+            "Stop": int(self._setup["Simulation"]["Iterations"]["Stop"]),
+            "Step": int(self._setup["Simulation"]["Iterations"]["Step"]),
+            "LogInterval": int(
+                self._setup["Simulation"]["Iterations"]["LogInterval"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Simulation"]["Iterations"], data)
         return data
@@ -90,19 +91,28 @@ class SimulationSetupReader(SimulationSetup):
         """
         Magnetorquer parameters, works for every axis of rotation.
 
-        returns:
-            int: n_coils - number of coils.
-            float: coil_area - area of each coil in cm^2.
-            float: max_current - maximum current in the torquer.
+        returns (dict):
+            Coils (int): number of coils.
+            CoilArea (float): area of each coil in cm^2.
+            MaxCurrent (float): maximum current in the torquer.
+            SafetyFactor (float): current reduction factor.
+            AlphaCap (float): angular acceleration cap (deg/s^2).
         """
-        data = dict()
-        data["Coils"] = int(self._setup["Actuators"]["Magnetorquer"]["Coils"])
-        data["RodArea"] = float(self._setup["Actuators"]["Magnetorquer"]["RodArea"])
-        data["MaxCurrent"] = float(self._setup["Actuators"]
-                                   ["Magnetorquer"]["MaxCurrent"])
-        data["SafetyFactor"] = float(
-            self._setup["Actuators"]["Magnetorquer"]["SafetyFactor"])
-        data["AlphaCap"] = float(self._setup["Actuators"]["Magnetorquer"]["AlphaCap"])
+        data = {
+            "Coils": int(self._setup["Actuators"]["Magnetorquer"]["Coils"]),
+            "CoilArea": float(
+                self._setup["Actuators"]["Magnetorquer"]["CoilArea"]
+            ),
+            "MaxCurrent": float(
+                self._setup["Actuators"]["Magnetorquer"]["MaxCurrent"]
+            ),
+            "SafetyFactor": float(
+                self._setup["Actuators"]["Magnetorquer"]["SafetyFactor"]
+            ),
+            "AlphaCap": float(
+                self._setup["Actuators"]["Magnetorquer"]["AlphaCap"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Actuators"]["Magnetorquer"], data)
         return data
@@ -112,13 +122,14 @@ class SimulationSetupReader(SimulationSetup):
         """
         Satellite parameters.
 
-        returns:
-            float: mass of the satellite in kg.
-            np.ndarray: inertia matrix in kg*m^2.
+        returns (dict):
+            Mass (float): mass of the satellite in kg.
+            Inertia (np.ndarray): inertia matrix in kg*m^2.
         """
-        data = dict()
-        data["Mass"] = float(self._setup["Satellite"]["Params"]["Mass"])
-        data["Inertia"] = np.array(self._setup["Satellite"]["Params"]["Inertia"])
+        data = {
+            "Mass": float(self._setup["Satellite"]["Params"]["Mass"]),
+            "Inertia": np.array(self._setup["Satellite"]["Params"]["Inertia"]),
+        }
         data
         return data
 
@@ -132,10 +143,11 @@ class SimulationSetupReader(SimulationSetup):
             float: M - mass of the planet in kg.
             float: R - radius of the planet in m.
         """
-        data = dict()
-        data["G"] = float(self._setup["Simulation"]["PlanetConst"]["G"])
-        data["M"] = float(self._setup["Simulation"]["PlanetConst"]["M"])
-        data["R"] = float(self._setup["Simulation"]["PlanetConst"]["R"])
+        data = {
+            "G": float(self._setup["Simulation"]["PlanetConst"]["G"]),
+            "M": float(self._setup["Simulation"]["PlanetConst"]["M"]),
+            "R": float(self._setup["Simulation"]["PlanetConst"]["R"]),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Simulation"]["PlanetConst"], data)
         return data
@@ -145,10 +157,22 @@ class SimulationSetupReader(SimulationSetup):
         """
         Date and time of the simulation start.
 
-        returns:
-            datetime: date_time - date and time of the simulation start.
+        Returns:
+            datetime.datetime: Current time if "Now" is true, otherwise parsed from
+                JSON fields.
         """
-        return {"OnTime": int(self._setup["Sensors"]["OnTime"])}
+        date_config = self._setup["Simulation"]["Date"]
+        if date_config.get("Now", False):
+            return datetime.datetime.now()
+
+        return datetime.datetime(
+            year=int(date_config["Year"]),
+            month=int(date_config["Month"]),
+            day=int(date_config["Day"]),
+            hour=int(date_config["Hour"]),
+            minute=int(date_config["Minute"]),
+            second=int(date_config["Second"])
+        )
 
     @property
     def sensors_on_time(self) -> int:
@@ -166,14 +190,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         Magnetometer settings.
 
-        returns:
-            bool: noise flag.
-            float: maximum noise amplitude (nT).
+        returns (dict):
+            Noise (bool): noise flag.
+            AbsoluteNoise (float): maximum noise amplitude (nT).
         """
-        data = dict()
-        data["Noise"] = bool(self._setup["Sensors"]["Magnetometer"]["Noise"])
-        data["AbsoluteNoise"] = float(
-            self._setup["Sensors"]["Magnetometer"]["AbsoluteNoise"])
+        data = {
+            "Noise": bool(self._setup["Sensors"]["Magnetometer"]["Noise"]),
+            "AbsoluteNoise": float(
+                self._setup["Sensors"]["Magnetometer"]["AbsoluteNoise"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Sensors"]["Magnetometer"], data)
         return data
@@ -183,14 +209,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         Sun sensor settings.
 
-        returns:
-            bool: noise flag.
-            float: angular noise (deg).
+        returns (dict):
+            Noise (bool): noise flag.
+            AngularNoise (float): angular noise (deg).
         """
-        data = dict()
-        data["Noise"] = bool(self._setup["Sensors"]["SunSensor"]["Noise"])
-        data["AngularNoise"] = float(
-            self._setup["Sensors"]["SunSensor"]["AngularNoise"])
+        data = {
+            "Noise": bool(self._setup["Sensors"]["SunSensor"]["Noise"]),
+            "AngularNoise": float(
+                self._setup["Sensors"]["SunSensor"]["AngularNoise"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Sensors"]["SunSensor"], data)
         return data
@@ -200,14 +228,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         Gyroscope settings.
 
-        returns:
-            np.ndarray: bias (deg/s).
-            np.ndarray: process noise (deg/s).
+        returns (dict):
+            Bias (np.ndarray): bias (deg/s).
+            ProcessNoise (np.ndarray): process noise (deg/s).
         """
-        data = dict()
-        data["Bias"] = np.array(self._setup["Sensors"]["Gyroscope"]["Bias"])
-        data["ProcessNoise"] = np.array(
-            self._setup["Sensors"]["Gyroscope"]["ProcessNoise"])
+        data = {
+            "Bias": np.array(self._setup["Sensors"]["Gyroscope"]["Bias"]),
+            "ProcessNoise": np.array(
+                self._setup["Sensors"]["Gyroscope"]["ProcessNoise"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Sensors"]["Gyroscope"], data)
         return data
@@ -217,11 +247,10 @@ class SimulationSetupReader(SimulationSetup):
         """
         QUEST parameters.
 
-        returns:
-            np.ndarray: weights for measurements.
+        returns (dict):
+            Weights (np.ndarray): weights for measurements.
         """
-        data = dict()
-        data["Weights"] = np.array(self._setup["Sensors"]["QUEST"]["Weights"])
+        data = {"Weights": np.array(self._setup["Sensors"]["QUEST"]["Weights"])}
         data = self._check_for_additional_keys_in_section(
             self._setup["Sensors"]["QUEST"], data)
         return data
@@ -231,14 +260,14 @@ class SimulationSetupReader(SimulationSetup):
         """
         EKF parameters.
 
-        returns:
-            np.ndarray: attitude noise in degrees.
-            float: covariance value.
-            float: measurement noise value.
+        returns (dict):
+            AttitudeNoise (np.ndarray): attitude noise in degrees.
+            Covariance (float): covariance value.
         """
-        data = dict()
-        data["AttitudeNoise"] = np.array(self._setup["Sensors"]["EKF"]["AttitudeNoise"])
-        data["Covariance"] = float(self._setup["Sensors"]["EKF"]["Covariance"])
+        data = {
+            "AttitudeNoise": np.array(self._setup["Sensors"]["EKF"]["AttitudeNoise"]),
+            "Covariance": float(self._setup["Sensors"]["EKF"]["Covariance"])
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Sensors"]["EKF"], data)
         return data
@@ -262,27 +291,25 @@ class SimulationSetupReader(SimulationSetup):
         used in the modified b-dot, the angular velocity and magnetic field adaptation
         are able to work together).
 
-        returns:
-            dict: set of bool indicating the selected mode:
-                'proportional' : Whether to adapt the gain based on the angular
-                velocity to include damping,
-                'modified' : Whether to use the modified B-dot control law that
-                is based directly on the angular velocity (gyroscopes) and
-                magnetic field measurements, instead of magnetic field rate of change,
-                'adapt_velocity' : Whether to adapt the gain based on the angular
-                velocity,
-                'adapt_magnetic' : Whether to adapt the gain based on the magnetic
-                field strength,
-                'bang_bang' : Whether to use bang-bang control that sets control
-                output to maximum or minimum.
+        returns (dict of bool):
+            Proportional : proportional damping term enabled.
+            Modified : use modified B-dot (ω × B).
+            AdaptVelocity : velocity-based adaptive gain.
+            AdaptMagnetic : magnetic-field-based adaptive gain.
+            BangBang : bang-bang control.
         """
 
-        data = dict()
-        data["Proportional"] = bool(self._setup["Controls"]["Bdot"]["Proportional"])
-        data["Modified"] = bool(self._setup["Controls"]["Bdot"]["Modified"])
-        data["AdaptVelocity"] = bool(self._setup["Controls"]["Bdot"]["AdaptVelocity"])
-        data["AdaptMagnetic"] = bool(self._setup["Controls"]["Bdot"]["AdaptMagnetic"])
-        data["BangBang"] = bool(self._setup["Controls"]["Bdot"]["BangBang"])
+        data = {
+            "Proportional": bool(self._setup["Controls"]["Bdot"]["Proportional"]),
+            "Modified": bool(self._setup["Controls"]["Bdot"]["Modified"]),
+            "AdaptVelocity": bool(
+                self._setup["Controls"]["Bdot"]["AdaptVelocity"]
+            ),
+            "AdaptMagnetic": bool(
+                self._setup["Controls"]["Bdot"]["AdaptMagnetic"]
+            ),
+            "BangBang": bool(self._setup["Controls"]["Bdot"]["BangBang"]),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Controls"]["Bdot"], data)
         return data
@@ -292,32 +319,36 @@ class SimulationSetupReader(SimulationSetup):
         """
         B-dot control parameters.
 
-        returns:
-            int: (k) The gain factor for the b-dot control law. Applied in the
+        returns (dict):
+             Gain (float): The gain factor for the b-dot control law. Applied in the
                 standard B-dot control law and is the base for adaptive versions.
-            float: (k_p) Proportional gain for the B-dot control law. Determines
-                how much the magnetic dipole moment is adjusted based on the
+            ProportionalGain (float): Proportional gain for the B-dot control law.
+                Determines how much the magnetic dipole moment is adjusted based on the
                 angular velocity.
-            float: Reference angular velocity for the
+            AngularVelocityRef (float): Reference angular velocity for the
                 adaptive B-dot control law in deg/s. Is the assumed value when the
                 algorithm should switch from fast detumbling to more control.
-            float: Exponent for the angular velocity adaptation.
-            int: Reference magnetic field for the adaptive B-dot control law
-                in nT. Is the assumed somewhere about the average magnetic field on the
-                low Earth orbit.
-            float: Exponent for the magnetic field adaptation.
+            Alpha (float): Exponent for the angular velocity adaptation.
+            MagneticFieldRef (int): Reference magnetic field for the adaptive B-dot
+            control law in nT. Is the assumed value somewhere about the average
+                magnetic field on the low Earth orbit.
+            Beta (float): Exponent for the magnetic field adaptation.
 
         """
-        data = dict()
-        data["Gain"] = float(self._setup["Controls"]["Bdot"]["Gain"])
-        data["ProportionalGain"] = float(
-            self._setup["Controls"]["Bdot"]["ProportionalGain"])
-        data["AngularVelocityRef"] = float(
-            self._setup["Controls"]["Bdot"]["AngularVelocityRef"])
-        data["Alpha"] = float(self._setup["Controls"]["Bdot"]["Alpha"])
-        data["MagneticFieldRef"] = int(
-            self._setup["Controls"]["Bdot"]["MagneticFieldRef"])
-        data["Beta"] = float(self._setup["Controls"]["Bdot"]["Beta"])
+        data = {
+            "Gain": float(self._setup["Controls"]["Bdot"]["Gain"]),
+            "ProportionalGain": float(
+                self._setup["Controls"]["Bdot"]["ProportionalGain"]
+            ),
+            "AngularVelocityRef": float(
+                self._setup["Controls"]["Bdot"]["AngularVelocityRef"]
+            ),
+            "Alpha": float(self._setup["Controls"]["Bdot"]["Alpha"]),
+            "MagneticFieldRef": int(
+                self._setup["Controls"]["Bdot"]["MagneticFieldRef"]
+            ),
+            "Beta": float(self._setup["Controls"]["Bdot"]["Beta"]),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Controls"]["Bdot"], data)
         return data
@@ -327,14 +358,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         B-cross mode settings.
 
-        returns:
-            str: task mode ("earth_pointing" or "sun_pointing").
-            np.ndarray: pointing axis.
+        returns (dict):
+            Task (str): task mode ("earth_pointing" or "sun_pointing").
+            PointingAxis (np.ndarray): pointing axis.
         """
-        data = dict()
-        data["Task"] = str(self._setup["Controls"]["Bcross"]["Task"])
-        data["PointingAxis"] = np.array(
-            self._setup["Controls"]["Bcross"]["PointingAxis"])
+        data = {
+            "Task": str(self._setup["Controls"]["Bcross"]["Task"]),
+            "PointingAxis": np.array(
+                self._setup["Controls"]["Bcross"]["PointingAxis"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Controls"]["Bcross"], data)
         return data
@@ -344,16 +377,16 @@ class SimulationSetupReader(SimulationSetup):
         """
         B-cross control parameters.
 
-        returns:
-            float: align gain that determines how quickly the system aligns with
-                the target.
-            float: proportional gain that determines how much the system will damp
-            angular velocity.
+        returns (dict):
+            AlignGain (float): alignment gain.
+            ProportionalGain (float): damping gain.
         """
-        data = dict()
-        data["AlignGain"] = float(self._setup["Controls"]["Bcross"]["AlignGain"])
-        data["ProportionalGain"] = float(
-            self._setup["Controls"]["Bcross"]["ProportionalGain"])
+        data = {
+            "AlignGain": float(self._setup["Controls"]["Bcross"]["AlignGain"]),
+            "ProportionalGain": float(
+                self._setup["Controls"]["Bcross"]["ProportionalGain"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Controls"]["Bcross"], data)
         return data
@@ -373,24 +406,30 @@ class SimulationSetupReader(SimulationSetup):
         """
         Mode management thresholds.
 
-        returns:
-            float: detumbling off threshold (deg/s).
-            float: detumbling on threshold (deg/s).
-            float: pointing off error angle (deg).
-            float: pointing on error angle (deg).
-            int: pointing dwell time (s).
+        returns (dict):
+            DetumblingOff (float): detumbling off threshold (deg/s).
+            DetumblingOn (float): detumbling on threshold (deg/s).
+            PointingOff (float): pointing off error angle (deg).
+            PointingOn (float): pointing on error angle (deg).
+            PointingDwellTime (int): pointing dwell time (s).
         """
-        data = dict()
-        data["DetumblingOff"] = float(
-            self._setup["Controls"]["ModeManagement"]["DetumblingOff"])
-        data["DetumblingOn"] = float(
-            self._setup["Controls"]["ModeManagement"]["DetumblingOn"])
-        data["PointingOff"] = float(self._setup["Controls"]
-                                    ["ModeManagement"]["PointingOff"])
-        data["PointingOn"] = float(self._setup["Controls"]
-                                   ["ModeManagement"]["PointingOn"])
-        data["PointingDwellTime"] = int(
-            self._setup["Controls"]["ModeManagement"]["PointingDwellTime"])
+        data = {
+            "DetumblingOff": float(
+                self._setup["Controls"]["ModeManagement"]["DetumblingOff"]
+            ),
+            "DetumblingOn": float(
+                self._setup["Controls"]["ModeManagement"]["DetumblingOn"]
+            ),
+            "PointingOff": float(
+                self._setup["Controls"]["ModeManagement"]["PointingOff"]
+            ),
+            "PointingOn": float(
+                self._setup["Controls"]["ModeManagement"]["PointingOn"]
+            ),
+            "PointingDwellTime": int(
+                self._setup["Controls"]["ModeManagement"]["PointingDwellTime"]
+            ),
+        }
         data = self._check_for_additional_keys_in_section(
             self._setup["Controls"]["ModeManagement"], data)
         return data
@@ -409,12 +448,11 @@ class SimulationSetupReader(SimulationSetup):
             # If expected children are defined, compare immediate keys
             if isinstance(top_val, dict):
                 expected_children = self._BASE_KEYS[top_key]
-                extra_children = {
+                if extra_children := {
                     child_key: child_val
                     for child_key, child_val in top_val.items()
                     if child_key not in expected_children
-                }
-                if extra_children:
+                }:
                     self.other_parameters[top_key] = extra_children
         return self.other_parameters if self.other_parameters else None
 

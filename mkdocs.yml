@@ -1,0 +1,77 @@
+site_name: Small Satellite ADCS Documentation
+site_url: https://adcs-a-drabik.com
+repo_url: https://github.com/arekdrabik/ADCS
+edit_uri: blob/main/docs/
+strict: true
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  font:
+    text: Space Grotesk
+    code: JetBrains Mono
+  features:
+    - content.code.copy
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+      primary: amber
+      accent: deep orange
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+      primary: blue gray
+      accent: deep purple
+
+nav:
+  - Code documentation: index.md
+  - Theoretical background (eng): adcs.md
+  - Podstawy teoretyczne (pl): adcs_pl.md
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      fallback_to_build_date: true
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: false
+            merge_init_into_class: true
+            filters:
+              - "!^__init__$"
+              # - "!^_"
+  # - minify:
+  #     minify_html: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.emoji
+  - pymdownx.tabbed
+  - pymdownx.tasklist
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/arekdrabik
+    - icon: fontawesome/solid/envelope
+      link: mailto:arek.drabik1453@gmail.com

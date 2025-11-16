@@ -41,7 +41,7 @@ class MagnetorquerImplementation:
         self._tau_prev: np.ndarray = np.zeros(3, dtype=float)
 
         self.no_of_coils = self._setup.magnetorquer_params["Coils"]
-        self.coil_area = self._setup.magnetorquer_params["RodArea"]
+        self.coil_area = self._setup.magnetorquer_params["CoilArea"]
         self.coil_area = self.coil_area * 1e-4  # Convert cm^2 to m^2
         self.max_current = self._setup.magnetorquer_params["MaxCurrent"]
         self.safety_factor = setup.magnetorquer_params["SafetyFactor"]
@@ -81,9 +81,9 @@ class MagnetorquerImplementation:
         # B-cross with proportional damping
         self.k_cp = setup.b_cross_parameters["ProportionalGain"]
 
-        # --- b_cross-only damping gate: force damp-only above 0.3 deg/s until < 0.2 deg/s
+        # b_cross-only damping gate: force damp-only above 0.3 deg/s until < 0.2 deg/s
         self._bcross_damp_only_gate = False
-        self._poor_geom_gate = False  # NEW
+        self._poor_geom_gate = False
 
     def b_dot(
         self,
@@ -167,7 +167,8 @@ class MagnetorquerImplementation:
         else:
             mag_dipol_mom_required = k * db_dt
 
-        current_per_axis, commanded_dipol = self.apply_torquer_with_saturation(mag_dipol_mom_required)
+        current_per_axis, commanded_dipol = self.apply_torquer_with_saturation(
+            mag_dipol_mom_required)
         angular_acceleration, current_per_axis = self.current_to_angular_acceleration(
             commanded_dipol,
             magnetic_field,
@@ -236,12 +237,12 @@ class MagnetorquerImplementation:
 
         A = float(np.dot(a, a))
         B = float(np.dot(a, b))
-        C = float(np.dot(b, b)) - cap * cap
+        C = float(np.dot(b, b)) - cap**2
 
         if A <= 1e-16:
             s = 0.0
         else:
-            D = B * B - A * C
+            D = B**2 - A * C
             if D >= 0.0:
                 r = np.sqrt(D)
                 s1 = (-B - r) / A
@@ -334,8 +335,8 @@ class MagnetorquerImplementation:
         target_dir_body: np.ndarray,
     ) -> np.ndarray:
         """
-        B-cross pointing control (nadir). Generates angular acceleration (rad/s^2)
-        based in the error angle. The method combines alignment and damping
+        B-cross pointing control (Earth or Sun pointing). Generates angular acceleration
+        (rad/s^2) based on the error angle. The method combines alignment and damping
         torques to achieve stable pointing.
 
         Args:
@@ -526,11 +527,10 @@ class MagnetorquerImplementation:
         omega_off = ut.degrees_to_rad(off_deg)
 
         if self._bcross_damp_only_gate:
-            if omega_norm < omega_off:
+            if omega_norm <= omega_off:
                 self._bcross_damp_only_gate = False
-        else:
-            if omega_norm > omega_on:
-                self._bcross_damp_only_gate = True
+        elif omega_norm > omega_on:
+            self._bcross_damp_only_gate = True
 
         return self._bcross_damp_only_gate
 
@@ -549,7 +549,7 @@ class MagnetorquerImplementation:
         Disabled while 'gated' is True (state still updated).
         """
         if gated:
-            self._bcross_omega_norm_prev = float(omega_norm)
+            self._bcross_omega_norm_prev = omega_norm
             return 1.0
 
         prev = getattr(self, "_bcross_omega_norm_prev", None)
@@ -558,11 +558,11 @@ class MagnetorquerImplementation:
         if prev is not None:
             d_omega = float(omega_norm - prev)
             if d_omega > deadband:
-                scale = float(scale_inc)
+                scale = scale_inc
             elif d_omega < -deadband:
-                scale = float(scale_dec)
+                scale = scale_dec
 
-        self._bcross_omega_norm_prev = float(omega_norm)
+        self._bcross_omega_norm_prev = omega_norm
         return scale
 
     def _apply_angle_bands(
@@ -579,7 +579,7 @@ class MagnetorquerImplementation:
         Apply angle-band logic and return (m_align, m_damp).
         Defaults:
         - theta > pointing_deg_threshold_deg → pure damping
-        - mid_deg < theta ≤ pointing_deg_threshold_deg → alignment + mid_damp_fraction*damping
+        - mid_deg < theta ≤ pointing_deg_threshold_deg → alignment + mid damping
         - theta ≤ mid_deg → pure damping (scaled by small_angle_damp_multiplier)
         """
         m_align = m_align_base.copy()
@@ -589,10 +589,10 @@ class MagnetorquerImplementation:
             m_align[:] = 0.0
         elif theta > np.deg2rad(mid_deg):
             # mid band: do not zero damping completely
-            m_damp = m_damp_base * float(mid_damp_fraction)
+            m_damp = m_damp_base * mid_damp_fraction
         else:
             m_align[:] = 0.0
-            m_damp *= float(small_angle_damp_multiplier)
+            m_damp *= small_angle_damp_multiplier
 
         return m_align, m_damp
 
@@ -600,7 +600,7 @@ class MagnetorquerImplementation:
         th = np.degrees(theta_rad)
         if th > 60:  # large: mostly damp
             return 0.4 * self.k_c, 1.25 * self.k_cp
-        if th > 25:  # mid: nominal
+        if th > 25:
             return self.k_c, self.k_cp
         # small: hold & fine align
         return 1.3 * self.k_c, 0.9 * self.k_cp

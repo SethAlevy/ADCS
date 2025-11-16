@@ -72,7 +72,7 @@ class MagnetometerImplementation:
         self,
         satellite: Satellite,
         julian_date: skyfield.Time,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Simulate the magnetometer readings. This method computes the
         magnetic field vector at a given position and date, optionally adds
@@ -81,15 +81,15 @@ class MagnetometerImplementation:
 
         Args:
             satellite (Satellite): The satellite object containing the TLE data and
-            current status.
+                current status.
             julian_date (skyfield.Time): Julian date for which the magnetic field vector
                 is to be computed.
 
         Returns:
-            np.ndarray: Simulated magnetic field vectors in the Satellite Body Frame
-                (SBF) and Earth-Centered Inertial (ECI) frame. Returned in nT
-                (nanoTesla). The first three elements are in the SBF frame, and the
-                next three are in the ECI frame.
+            tuple[np.ndarray, np.ndarray]: Simulated magnetic field vectors in the
+                Satellite Body Frame (SBF) and Earth-Centered Inertial (ECI) frame.
+                Returned in nT (nanoTesla). The first three elements are in the SBF
+                frame, and the next three are in the ECI frame.
         """
         mag_field_ned = self.get_magnetic_field(satellite, julian_date)
         # Convert NED to ENU: ENU = [East, North, Up] = [NED[1], NED[0], -NED[2]]
@@ -178,7 +178,7 @@ class SunsensorImplementation:
 
         if self.noise:
             angular_noise = np.random.uniform(
-                -self.angular_noise_max / 2, self.angular_noise_max / 2, 1
+                -self.angular_noise_max, self.angular_noise_max, 1
             )
             sun_sbf = tr.vector_angular_noise(sun_sbf, angular_noise[0])
         return sun_sbf, sun_eci
@@ -250,7 +250,7 @@ class SensorFusionImplementation:
 
     def triad(
         self, v_b_list: list[np.ndarray], v_i_list: list[np.ndarray]
-    ) -> np.ndarray:
+    ) -> np.ndarray:    # sourcery skip: class-extract-method
         """
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
         of two sensors. It is a basic and simple algorithm used in aerospace. This
@@ -271,18 +271,8 @@ class SensorFusionImplementation:
             np.ndarray: quaternion representing the rotation from inertial to body
                 frame.
         """
-        v1_i = ut.normalize(v_i_list[0])
-        v2_i = ut.normalize(v_i_list[1])
-
-        # Build TRIAD in inertial frame
-        R_i = self.build_triad(v1_i, v2_i)
-
-        v1_b = ut.normalize(v_b_list[0])
-        v2_b = ut.normalize(v_b_list[1])
-
-        # Build TRIAD in body frame
-        R_b = self.build_triad(v1_b, v2_b)
-
+        R_i = self._compute_normalized_triad(v_i_list)
+        R_b = self._compute_normalized_triad(v_b_list)
         # Rotation matrix from inertial to body frame
         R = np.matmul(R_b, R_i.T)
         quaternion = tr.rotation_matrix_to_quaternion(R)
@@ -290,6 +280,15 @@ class SensorFusionImplementation:
         quaternion = self._align_quaternion_sign("triad", quaternion)
         self.save_to_data_dict("triad", quaternion)
         return quaternion
+
+    def _compute_normalized_triad(self, arg0):
+        v1_i = ut.normalize(arg0[0])
+        v2_i = ut.normalize(arg0[1])
+
+        # Build TRIAD in inertial frame
+        result = self.build_triad(v1_i, v2_i)
+
+        return result
 
     def build_triad(self, v1: np.ndarray, v2: np.ndarray) -> np.ndarray:
         """
@@ -490,7 +489,7 @@ class SensorFusionImplementation:
 
         # Update state
         delta_state = np.matmul(K, innovation)
-        delta_rotation = R.from_rotvec(delta_state[0:3])
+        delta_rotation = R.from_rotvec(delta_state[:3])
         updated_rotation = delta_rotation * R.from_quat(quaternion)
         quaternion = updated_rotation.as_quat()
 
