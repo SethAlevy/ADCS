@@ -20,7 +20,7 @@ poetry run python adcs.py
 
 Full documentation including theoretical background, API reference, and usage examples:
 
-**[https://adcs-a-drabik.com](https://adcs-a-drabik.com)**
+**[https://sethalevy.github.io/ADCS/](https://sethalevy.github.io/ADCS/)**
 
 ## Features
 
