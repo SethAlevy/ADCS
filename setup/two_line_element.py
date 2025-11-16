@@ -9,10 +9,10 @@ class TwoLineElementReader(TwoLineElement):
 
     def __init__(self, tle_txt: Path):
         """
-        Initialize the TLE reader with the given filename.
+        Initialize TLE reader from file.
 
         Args:
-            filename (Path): Path to the TLE txt file.
+            tle_txt: Path to TLE text file.
         """
         self.tle = tle_txt
 
