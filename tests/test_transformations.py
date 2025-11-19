@@ -5,8 +5,8 @@ from core.transformations import (
     euler_xyz_to_quaternion,
     quaternion_to_euler_xyz,
     rotate_vector_by_quaternion,
-    sbf_to_eci,
-    eci_to_sbf,
+    sb_to_eci,
+    eci_to_sb,
     quat_multiply,
     update_quaternion_by_angular_velocity,
     ecef_to_eci,
@@ -62,9 +62,9 @@ def test_ecef_to_eci_rotation_zero_and_quarter_turn():
     assert np.allclose(v90, np.array([0.0, 1.0, 0.0]), atol=1e-12)
 
 
-def test_eci_sbf_roundtrip():
+def test_eci_sb_roundtrip():
     v = np.array([0.3, 0.4, -0.5])
     q = euler_xyz_to_quaternion([12, 34, 56], degrees=True)
-    v_b = eci_to_sbf(v, q)
-    v_back = sbf_to_eci(v_b, q)
+    v_b = eci_to_sb(v, q)
+    v_back = sb_to_eci(v_b, q)
     assert np.allclose(v, v_back, atol=1e-9)

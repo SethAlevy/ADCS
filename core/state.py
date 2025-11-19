@@ -12,23 +12,43 @@ class State:
         return self._rows
 
     def reset(self) -> None:
-        """Clear all columns and row count."""
+        """
+        Clear all columns and row count.
+        """
         self._cols.clear()
         self._rows = 0
 
     def _ensure_col(self, name: str) -> list[float]:
+        """
+        Ensure all column is aligned with current index.
+
+        Args:
+            name (str): column name.
+
+        Returns:
+            list[float]: column values
+        """
         if name not in self._cols:
             # back-fill all previous rows with NaN when a new column is introduced late
             self._cols[name] = [np.nan] * (self._rows - 1)
         return self._cols[name]
 
     def next_row(self) -> None:
-        """Start a new row; pre-fill all existing columns with NaN."""
+        """
+        Start a new row, pre-fill all existing columns with NaN.
+        """
         self._rows += 1
         for col in self._cols.values():
             col.append(np.nan)
 
     def register_value(self, name: str, value) -> None:
+        """
+        Register value into state vector.
+
+        Args:
+            name (str): column name.
+            value (_type_): value to register.
+        """
         col = self._ensure_col(name)
         # Ensure this column is aligned with the current row index
         if len(col) < self._rows - 1:
@@ -44,19 +64,48 @@ class State:
             # if someone appended too far, trim to the current row then append
             col[:] = col[: self._rows - 1] + [value]
 
-    def register_vector(self, name, vector, labels=["x", "y", "z"]) -> None:
+    def register_vector(
+            self,
+            name: str,
+            vector: list[float],
+            labels: list[str] = ["x", "y", "z"]
+    ) -> None:
+        """
+        Register a multielement vector using the given sufixes.
+
+        Args:
+            name (str): base column name.
+            vector (list[float]): vector to register.
+            labels (list[str], optional): suffixes for vector elements.
+                Defaults to ["x", "y", "z"].
+        """
         for i, label in enumerate(labels):
             self.register_value(f"{name}_{label}", vector[i])
 
     def fill_missing(self) -> None:
+        """
+        Fill missing values in all columns with NaN to ensure equal length.
+        """
         max_rows = max(len(col) for col in self._cols.values())
         for col in self._cols.values():
             while len(col) < max_rows:
                 col.append(np.nan)
 
     def to_dataframe(self) -> pd.DataFrame:
+        """
+        Return the vector as Pandas DatFrame.
+
+        Returns:
+            pd.DataFrame: state as DataFrame.
+        """
         return pd.DataFrame(self._cols)
 
     def to_csv(self, filepath: str) -> None:
+        """
+        Save state as csv,
+
+        Args:
+            filepath (str): path to save csv file.
+        """
         df = self.to_dataframe()
         df.to_csv(filepath, index=False)

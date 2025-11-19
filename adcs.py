@@ -130,11 +130,11 @@ def main():
         satellite.update_iteration(x)
         satellite.apply_rotation()
 
-        mag_field_sbf, mag_field_eci = satellite.magnetic_field
-        sun_vector_sbf, sun_vector_eci = satellite.sun_vector
+        mag_field_sb, mag_field_eci = satellite.magnetic_field
+        sun_vector_sb, sun_vector_eci = satellite.sun_vector
 
         satellite.fuse_sensors(
-            [mag_field_sbf, sun_vector_sbf],
+            [mag_field_sb, sun_vector_sb],
             [mag_field_eci, sun_vector_eci],
             quaternion_prev
         )

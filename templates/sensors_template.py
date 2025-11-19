@@ -12,7 +12,7 @@ class Magnetometer(ABC):
     Earth's magnetic field vector at a given satellite position and time using the
     International Geomagnetic Reference Field (IGRF) model. The measurement
     is simulated in the X, Y, Z axes by transforming it to the Satellite Body
-    Frame (SBF) and optionally adding noise.
+    Frame (SB) and optionally adding noise.
     """
 
     @abstractmethod
@@ -47,7 +47,7 @@ class Magnetometer(ABC):
         """
         Simulate the magnetometer readings. This method computes the
         magnetic field vector at a given position and date, optionally adds
-        noise and transforms it to the Satellite Body Frame (SBF) and Earth
+        noise and transforms it to the Satellite Body Frame (SB) and Earth
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
         Args:
@@ -58,8 +58,8 @@ class Magnetometer(ABC):
 
         Returns:
             tuple[np.ndarray, np.ndarray]: Simulated magnetic field vectors in the
-                Satellite Body Frame (SBF) and Earth-Centered Inertial (ECI) frame.
-                Returned in nT (nanoTesla). The first three elements are in the SBF
+                Satellite Body Frame (SB) and Earth-Centered Inertial (ECI) frame.
+                Returned in nT (nanoTesla). The first three elements are in the SB
                 frame, and the next three are in the ECI frame.
         """
         pass
@@ -97,7 +97,7 @@ class Sunsensor(ABC):
         """
         Simulate the Sun sensor readings. This method computes the Sun vector
         at a given satellite position and date, optionally adds noise and transforms it
-        to the Satellite Body Frame (SBF).
+        to the Satellite Body Frame (SB).
 
         Args:
             satellite (object): The satellite object containing the TLE data and
@@ -106,7 +106,7 @@ class Sunsensor(ABC):
                 be computed.
 
         Returns:
-            np.ndarray: Simulated Sun vector in the Satellite Body Frame (SBF).
+            np.ndarray: Simulated Sun vector in the Satellite Body Frame (SB).
         """
         pass
 
@@ -130,7 +130,7 @@ class SensorFusion(ABC):
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
         of two sensors. It is a basic and simple algorithm used in aerospace. This
         method computes a rotation matrix from inertial to body frame using two
-        vectors in both frames (SBF, ECI). The resulting rotation is a relative
+        vectors in both frames (SB, ECI). The resulting rotation is a relative
         transformation between two orthogonal triads (coordinate systems created
         based on the given vectors) that represent different frames. The first vector
         is typically the more accurate measurement.

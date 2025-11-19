@@ -50,7 +50,7 @@ class Magnetorquer(ABC):
     @abstractmethod
     def b_cross(
         self,
-        magnetic_field_sbf: np.ndarray,
+        magnetic_field_sb: np.ndarray,
         align_axis: np.ndarray | list,
         target_dir_body: np.ndarray,
     ) -> np.ndarray:
@@ -60,7 +60,7 @@ class Magnetorquer(ABC):
         torques to achieve stable pointing.
 
         Args:
-            magnetic_field_sbf (np.ndarray): The magnetic field vector in the
+            magnetic_field_sb (np.ndarray): The magnetic field vector in the
                 spacecraft body frame in nT.
             align_axis (np.ndarray | list): The axis in the body frame to be aligned
                 with the target direction. Specified inside the initial settings json

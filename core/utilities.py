@@ -39,8 +39,8 @@ def basic_state_vector(satellite: Satellite) -> None:
     position = satellite.position
     velocity = satellite.linear_velocity
 
-    mag_field_sbf, mag_field_eci = satellite.magnetic_field
-    sun_vector_sbf, sun_vector_eci = satellite.sun_vector
+    mag_field_sb, mag_field_eci = satellite.magnetic_field
+    sun_vector_sb, sun_vector_eci = satellite.sun_vector
 
     euler_angles = satellite.euler_angles
     angular_velocity = satellite.angular_velocity
@@ -61,13 +61,13 @@ def basic_state_vector(satellite: Satellite) -> None:
         "angular_velocity", angular_velocity, labels=["x", "y", "z"]
     )
     satellite._state_vector.register_vector(
-        "magnetic_field_sbf", mag_field_sbf, labels=["x", "y", "z"]
+        "magnetic_field_sb", mag_field_sb, labels=["x", "y", "z"]
     )
     satellite._state_vector.register_vector(
         "magnetic_field_eci", mag_field_eci, labels=["x", "y", "z"]
     )
     satellite._state_vector.register_vector(
-        "sun_vector_sbf", sun_vector_sbf, labels=["x", "y", "z"]
+        "sun_vector_sb", sun_vector_sb, labels=["x", "y", "z"]
     )
     satellite._state_vector.register_vector(
         "sun_vector_eci", sun_vector_eci, labels=["x", "y", "z"]
@@ -97,11 +97,11 @@ def get_lla(satellite: Satellite) -> tuple:
     Returns:
         tuple: latitude, longitude and altitude of the satellite.
     """
-    lat = satellite.latitude(satellite.iteration)
-    lon = satellite.longitude(satellite.iteration)
-    alt = satellite.altitude(satellite.iteration)
+    latitude = satellite.latitude(satellite.iteration)
+    longitude = satellite.longitude(satellite.iteration)
+    altitude = satellite.altitude(satellite.iteration)
 
-    return lat, lon, alt
+    return latitude, longitude, altitude
 
 
 def rad_to_degrees(values: list | np.ndarray) -> np.ndarray:
@@ -155,21 +155,6 @@ def skew_symmetric(v: np.ndarray) -> np.ndarray:
     return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
 
 
-def filter_significant_digits(array: np.ndarray, sig_digits: int) -> np.ndarray:
-    """
-    Filter the array to have a specified number of significant digits.
-
-    Args:
-        array (np.ndarray): Input array of floats.
-        sig_digits (int): Number of significant digits to retain.
-
-    Returns:
-        np.ndarray: Array with values formatted to the specified significant digits.
-    """
-    format_str = f"{{:.{sig_digits-1}e}}"  # Scientific notation
-    return np.array([float(format_str.format(x)) for x in array])
-
-
 def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
     """
     Round each element to specified number of decimal places
@@ -187,9 +172,7 @@ def filter_decimal_places(array: np.ndarray, decimal_places: int) -> np.ndarray:
 def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray:
     """
     Uniformly scale 'vector' so that its L2 norm <= cap.
-    - Returns zeros if cap <= 0 or cap is not finite.
-    - Handles lists/tuples/ndarray.
-    - Copies output to avoid aliasing the input.
+    Returns zeros if cap <= 0 or cap is not finite.
 
     Args:
         vector (np.ndarray): Input vector.
@@ -199,21 +182,15 @@ def limit_norm(vector: np.ndarray, cap: float, eps: float = 1e-12) -> np.ndarray
     Returns:
         np.ndarray: Vector with limited norm.
     """
-    v = np.asarray(vector, dtype=float)
-    # scalar -> 1D
-    if v.ndim == 0:
-        v = np.array([float(v)], dtype=float)
+    if vector.ndim == 0:
+        vector = np.array([float(vector)], dtype=float)
 
-    # guard cap
-    try:
-        c = cap
-    except Exception:
-        c = np.nan
-    if not np.isfinite(c) or c <= 0.0:
-        return np.zeros_like(v)
+    if not np.isfinite(cap) or cap <= 0.0:
+        return np.zeros_like(vector)
 
-    n = float(np.linalg.norm(v))
-    return v.copy() if not np.isfinite(n) or n <= c else v * (c / max(n, eps))
+    n = float(np.linalg.norm(vector))
+    return vector.copy() if not np.isfinite(n) \
+        or n <= cap else vector * (cap / max(n, eps))
 
 
 def calculate_pointing_error(
@@ -233,8 +210,7 @@ def calculate_pointing_error(
     current_vector = current_vector / np.linalg.norm(current_vector)
     dot_product = np.clip(np.dot(target_vector, current_vector), -1.0, 1.0)
     angle_rad = np.arccos(dot_product)
-    angle_deg = np.degrees(angle_rad)
-    return angle_deg
+    return np.degrees(angle_rad)
 
 
 def log_init_state(setup) -> None:

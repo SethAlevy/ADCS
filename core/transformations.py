@@ -4,20 +4,24 @@ from scipy.spatial.transform import Rotation as R
 import skyfield.timelib
 
 
-def enu_to_ecef(enu_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
+def enu_to_ecef(
+        enu_vec: np.ndarray,
+        latitude_deg: float,
+        longitude_deg: float
+) -> np.ndarray:
     """
     Convert a vector from ENU (East-North-Up) to ECEF (Earth-Centered, Earth-Fixed).
 
     Args:
         enu_vec (np.ndarray): Vector in ENU frame.
-        lat_deg (float): Latitude in degrees.
+        latitude_deg (float): Latitude in degrees.
         lon_deg (float): Longitude in degrees.
 
     Returns:
         np.ndarray: Vector in ECEF frame.
     """
-    lat = np.deg2rad(lat_deg)
-    lon = np.deg2rad(lon_deg)
+    lat = np.deg2rad(latitude_deg)
+    lon = np.deg2rad(longitude_deg)
 
     sφ, cφ = np.sin(lat), np.cos(lat)
     sλ, cλ = np.sin(lon), np.cos(lon)
@@ -35,13 +39,17 @@ def enu_to_ecef(enu_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarr
     return rot_enu_to_ecef.apply(enu_vec)
 
 
-def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarray:
+def ned_to_ecef(
+        ned_vec: np.ndarray,
+        latitude_deg: float,
+        longitude_deg: float
+) -> np.ndarray:
     """
     Convert a vector from NED (North, East, Down) to ECEF using ENU as an intermediate.
 
     Args:
         ned_vec (np.ndarray): Vector in NED frame.
-        lat_deg (float): Latitude in degrees.
+        latitude_deg (float): Latitude in degrees.
         lon_deg (float): Longitude in degrees.
 
     Returns:
@@ -49,7 +57,7 @@ def ned_to_ecef(ned_vec: np.ndarray, lat_deg: float, lon_deg: float) -> np.ndarr
     """
     # NED → ENU: [N, E, D] → [E, N, U] = [E=NED[1], N=NED[0], U=-NED[2]]
     enu = np.array([ned_vec[1], ned_vec[0], -ned_vec[2]], dtype=float)
-    return enu_to_ecef(enu, lat_deg, lon_deg)
+    return enu_to_ecef(enu, latitude_deg, longitude_deg)
 
 
 def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib) -> np.ndarray:
@@ -76,9 +84,9 @@ def ecef_to_eci(ecef_vec: np.ndarray, time: skyfield.timelib) -> np.ndarray:
     return rot.apply(ecef_vec)
 
 
-def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
+def eci_to_sb(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     """
-    Transform a vector from the ECI (Earth-Centered Inertial) frame to the SBF
+    Transform a vector from the ECI (Earth-Centered Inertial) frame to the SB
     (Satellite Body Frame) using a quaternion.
 
     Args:
@@ -93,14 +101,14 @@ def eci_to_sbf(vec_eci: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     return rot.apply(vec_eci)
 
 
-def sbf_to_eci(vec_sbf: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
+def sb_to_eci(vec_sb: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     """
-    Transform a vector from the SBF (Satellite Body Frame) to the ECI
+    Transform a vector from the SB (Satellite Body Frame) to the ECI
     (Earth-Centered Inertial) frame using a quaternion.
-    The rotation from SBF to ECI is the inverse of the rotation from ECI to SBF.
+    The rotation from SB to ECI is the inverse of the rotation from ECI to SB.
 
     Args:
-        vec_sbf (np.ndarray): Vector in SBF frame.
+        vec_sb (np.ndarray): Vector in SB frame.
         quat_sb_from_eci (np.ndarray): Quaternion representing rotation from ECI to
             satellite body frame, in [x, y, z, w] format.
 
@@ -110,7 +118,7 @@ def sbf_to_eci(vec_sbf: np.ndarray, quat_sb_from_eci: np.ndarray) -> np.ndarray:
     # The inverse of a rotation is its conjugate.
     rot = R.from_quat(quat_sb_from_eci)
     inv_rot = rot.inv()
-    return inv_rot.apply(vec_sbf)
+    return inv_rot.apply(vec_sb)
 
 
 def euler_xyz_to_quaternion(
@@ -130,17 +138,17 @@ def euler_xyz_to_quaternion(
     return rot.as_quat()
 
 
-def quaternion_to_euler_xyz(quat, degrees: bool = True) -> np.ndarray:
+def quaternion_to_euler_xyz(quaternion, degrees: bool = True) -> np.ndarray:
     """
     Convert a quaternion to Euler angles in X-Y-Z convention (degrees).
 
     Args:
-        quat (np.ndarray): Quaternion in [x, y, z, w] format.
+        quaternion (np.ndarray): Quaternion in [x, y, z, w] format.
 
     Returns:
         np.ndarray: Euler angles [x1, y1, z1] in degrees.
     """
-    rot = R.from_quat(quat)
+    rot = R.from_quat(quaternion)
     return rot.as_euler("xyz", degrees=degrees)
 
 
@@ -197,8 +205,8 @@ def update_quaternion_by_angular_velocity(
     Returns:
         np.ndarray: Updated quaternion in [x, y, z, w] format.
     """
-    q_dot = quat_deriv(quaternion, angular_velocity)
-    quaternion_new = quaternion + q_dot * dt
+    qaterinion_dot = quat_deriv(quaternion, angular_velocity)
+    quaternion_new = quaternion + qaterinion_dot * dt
     quaternion_new /= np.linalg.norm(quaternion_new)  # Normalize the quaternion
     return quaternion_new
 
@@ -247,11 +255,10 @@ def earth_direction_body(
     Returns:
         np.ndarray: Unit Earth direction in body frame.
     """
-    p = np.asarray(position_eci, dtype=float)
-    n = np.linalg.norm(p)
-    if n == 0.0:
+    normal = np.linalg.norm(position_eci)
+    if normal == 0.0:
         return np.array([0.0, 0.0, -1.0])  # arbitrary fallback
-    to_earth_eci = -p / n
+    to_earth_eci = -position_eci / normal
     to_earth_body = rotate_vector_by_quaternion(to_earth_eci, quat_sb_from_eci)
     return to_earth_body / (np.linalg.norm(to_earth_body) + 1e-20)
 
@@ -279,7 +286,6 @@ def vector_angular_noise(vec: np.ndarray, angle_deg: float) -> np.ndarray:
         axis = np.cross(vec, [1, 0, 0])
         axis_norm = np.linalg.norm(axis)
     axis = axis / axis_norm
-    # Create rotation
     rot = R.from_rotvec(axis * angle_rad)
     return rot.apply(vec)
 
@@ -296,10 +302,9 @@ def sun_direction_body(
     Returns:
         np.ndarray: Unit Sun direction in body frame.
     """
-    v = np.asarray(sun_vector_eci, dtype=float)
-    n = np.linalg.norm(v)
-    if n == 0.0:
+    normal = np.linalg.norm(sun_vector_eci)
+    if normal == 0.0:
         return np.array([1.0, 0.0, 0.0])  # fallback
-    v_hat = v / n
-    sun_body = rotate_vector_by_quaternion(v_hat, quat_sb_from_eci)
+    sun_vector_hat = sun_vector_eci / normal
+    sun_body = rotate_vector_by_quaternion(sun_vector_hat, quat_sb_from_eci)
     return sun_body / np.linalg.norm(sun_body)

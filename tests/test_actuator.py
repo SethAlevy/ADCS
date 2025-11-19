@@ -21,7 +21,7 @@ class FakeSatellite:
 
     @property
     def magnetic_field(self):
-        # tuple (sbf, eci) in nT for constructor init
+        # tuple (sb, eci) in nT for constructor init
         return np.array([14000.0, -3500.0, -34000.0]) * 1e-9, np.array([14000.0, -3500.0, -34000.0]) * 1e-9
 
 

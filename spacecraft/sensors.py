@@ -20,7 +20,7 @@ class MagnetometerImplementation:
         Earth's magnetic field vector at a given satellite position and time using the
         International Geomagnetic Reference Field (IGRF) model. The measurement
         is simulated in the X, Y, Z axes by transforming it to the Satellite Body
-        Frame (SBF) and optionally adding noise. Noise parameters are specified in the
+        Frame (SB) and optionally adding noise. Noise parameters are specified in the
         initial settings json file.
 
         Args:
@@ -31,7 +31,7 @@ class MagnetometerImplementation:
         self.noise_max = setup.magnetometer["AbsoluteNoise"]
 
         # cache of last measurements (set by simulate_magnetometer)
-        self.last_sbf_measurement = None
+        self.last_sb_measurement = None
         self.last_eci_measurement = None
 
     def get_magnetic_field(self, satellite, julian_date: skyfield.Time) -> np.ndarray:
@@ -76,7 +76,7 @@ class MagnetometerImplementation:
         """
         Simulate the magnetometer readings. This method computes the
         magnetic field vector at a given position and date, optionally adds
-        noise and transforms it to the Satellite Body Frame (SBF) and Earth
+        noise and transforms it to the Satellite Body Frame (SB) and Earth
         Centered Inertial Frame (ECI). Returned in nT (nanoTesla).
 
         Args:
@@ -87,8 +87,8 @@ class MagnetometerImplementation:
 
         Returns:
             tuple[np.ndarray, np.ndarray]: Simulated magnetic field vectors in the
-                Satellite Body Frame (SBF) and Earth-Centered Inertial (ECI) frame.
-                Returned in nT (nanoTesla). The first three elements are in the SBF
+                Satellite Body Frame (SB) and Earth-Centered Inertial (ECI) frame.
+                Returned in nT (nanoTesla). The first three elements are in the SB
                 frame, and the next three are in the ECI frame.
         """
         mag_field_ned = self.get_magnetic_field(satellite, julian_date)
@@ -97,17 +97,17 @@ class MagnetometerImplementation:
             mag_field_ned, satellite.latitude, satellite.longitude
         )
         mag_field_eci = tr.ecef_to_eci(mag_field_ecef, julian_date)
-        mag_field_sbf = tr.eci_to_sbf(mag_field_eci, satellite.quaternion)
+        mag_field_sb = tr.eci_to_sb(mag_field_eci, satellite.quaternion)
 
         if self.noise:
             noise_vector = np.random.uniform(-self.noise_max / 2, self.noise_max / 2, 3)
-            mag_field_sbf += noise_vector
+            mag_field_sb += noise_vector
 
         # update cache
-        self.last_sbf_measurement = mag_field_sbf
+        self.last_sb_measurement = mag_field_sb
         self.last_eci_measurement = mag_field_eci
 
-        return mag_field_sbf, mag_field_eci
+        return mag_field_sb, mag_field_eci
 
 
 class SunsensorImplementation:
@@ -134,7 +134,7 @@ class SunsensorImplementation:
         self.earth = eph["earth"]
 
         # cache of last measurements (set by simulate_sunsensor)
-        self.last_sbf_measurement = None
+        self.last_sb_measurement = None
         self.last_eci_measurement = None
 
     def sun_vector_eci(self, julian_date: skyfield.Time) -> np.ndarray:
@@ -159,7 +159,7 @@ class SunsensorImplementation:
         """
         Simulate the Sun sensor readings. This method computes the Sun vector
         at a given satellite position and date, optionally adds noise and transforms it
-        to the Satellite Body Frame (SBF).
+        to the Satellite Body Frame (SB).
 
         Args:
             satellite (object): The satellite object containing the TLE data and
@@ -168,20 +168,20 @@ class SunsensorImplementation:
                 be computed.
 
         Returns:
-            np.ndarray: Simulated Sun vector in the Satellite Body Frame (SBF).
+            np.ndarray: Simulated Sun vector in the Satellite Body Frame (SB).
         """
         sun_eci = self.sun_vector_eci(julian_date)
-        sun_sbf = tr.eci_to_sbf(sun_eci, satellite.quaternion)
+        sun_sb = tr.eci_to_sb(sun_eci, satellite.quaternion)
 
         sun_eci = sun_eci / np.linalg.norm(sun_eci)
-        sun_sbf = sun_sbf / np.linalg.norm(sun_sbf)
+        sun_sb = sun_sb / np.linalg.norm(sun_sb)
 
         if self.noise:
             angular_noise = np.random.uniform(
                 -self.angular_noise_max, self.angular_noise_max, 1
             )
-            sun_sbf = tr.vector_angular_noise(sun_sbf, angular_noise[0])
-        return sun_sbf, sun_eci
+            sun_sb = tr.vector_angular_noise(sun_sb, angular_noise[0])
+        return sun_sb, sun_eci
 
 
 class SensorFusionImplementation:
@@ -255,7 +255,7 @@ class SensorFusionImplementation:
         TRIAD  (Three-Axis Attitude Determination) algorithm for attitude determination
         of two sensors. It is a basic and simple algorithm used in aerospace. This
         method computes a rotation matrix from inertial to body frame using two
-        vectors in both frames (SBF, ECI). The resulting rotation is a relative
+        vectors in both frames (SB, ECI). The resulting rotation is a relative
         transformation between two orthogonal triads (coordinate systems created
         based on the given vectors) that represent different frames. The first vector
         is typically the more accurate measurement.

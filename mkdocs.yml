@@ -1,5 +1,5 @@
 site_name: Small Satellite ADCS Documentation
-repo_url: https://github.com/arekdrabik/ADCS
+repo_url: https://github.com/SethAlevy/ADCS
 edit_uri: blob/main/docs/
 strict: false
 
@@ -12,6 +12,8 @@ theme:
     - content.code.copy
     - navigation.tabs
     - navigation.top
+    - navigation.sections
+    - navigation.expand
     - search.highlight
     - search.suggest
   palette:
@@ -47,9 +49,6 @@ plugins:
             merge_init_into_class: true
             filters:
               - "!^__init__$"
-              # - "!^_"
-  # - minify:
-  #     minify_html: true
 
 markdown_extensions:
   - admonition
@@ -65,10 +64,15 @@ markdown_extensions:
   - pymdownx.tasklist
   - toc:
       permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/arekdrabik
+      link: https://github.com/SethAlevy
     - icon: fontawesome/solid/envelope
       link: mailto:arek.drabik1453@gmail.com

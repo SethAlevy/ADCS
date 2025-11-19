@@ -39,5 +39,5 @@ Full documentation including theoretical background (english and polish), API re
 
 ## Contact
 
-GitHub: [@arekdrabik](https://github.com/arekdrabik)
+GitHub: [Arek Drabik](https://github.com/SethAlevy)
 

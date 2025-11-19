@@ -180,15 +180,15 @@ class Satellite(ABC):
     @abstractmethod
     def magnetic_field(self) -> np.ndarray:
         """
-        Get the magnetic field vector at the satellite's position in the SBF and
+        Get the magnetic field vector at the satellite's position in the SB and
         ECI frames. The first simulates the measurement, the second is used
         for debugging, sensor fusion algorithms etc. Both are in nT
-        (nanoTesla). Adding bias to the SBF vector can be adjusted in the
+        (nanoTesla). Adding bias to the SB vector can be adjusted in the
         magnetometer object.
 
         Returns:
-            np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
-            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
+            np.ndarray: Magnetic field vector in the SB and ECI frames in form of
+            [[SBx, SBy, SBz], [ECIx, ECIy, ECIz]].
         """
         pass
 
@@ -197,11 +197,11 @@ class Satellite(ABC):
     def sun_vector(self) -> np.ndarray:
         """
         Get the Sun vector as observed from Earth. The vector is computed in
-        ICRF and rotated to SBF; parallax due to satellite altitude is neglected.
+        ICRF and rotated to SB; parallax due to satellite altitude is neglected.
 
         Returns:
-            np.ndarray: Sun vector in the SBF and ECI frames in form of
-            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
+            np.ndarray: Sun vector in the SB and ECI frames in form of
+            [[SBx, SBy, SBz], [ECIx, ECIy, ECIz]].
         """
         pass
 

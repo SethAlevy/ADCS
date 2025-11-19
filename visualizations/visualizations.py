@@ -405,32 +405,32 @@ class MatplotlibPlots:
             filename="position_GCRS",
         )
 
-    def plot_magnetic_field_sbf(self, state_vector: pd.DataFrame) -> None:
+    def plot_magnetic_field_sb(self, state_vector: pd.DataFrame) -> None:
         """
-        Plot magnetic field components in SBF frame vs time.
+        Plot magnetic field components in SB frame vs time.
 
-        Requires: magnetic_field_sbf_x/y/z columns (nT).
+        Requires: magnetic_field_sb_x/y/z columns (nT).
         """
         series = {
-            "SBF X": (
+            "SB X": (
                 state_vector.index.values,
-                state_vector["magnetic_field_sbf_x"].values,
+                state_vector["magnetic_field_sb_x"].values,
             ),
-            "SBF Y": (
+            "SB Y": (
                 state_vector.index.values,
-                state_vector["magnetic_field_sbf_y"].values,
+                state_vector["magnetic_field_sb_y"].values,
             ),
-            "SBF Z": (
+            "SB Z": (
                 state_vector.index.values,
-                state_vector["magnetic_field_sbf_z"].values,
+                state_vector["magnetic_field_sb_z"].values,
             ),
         }
         self.line_plot(
             series=series,
-            title="Satellite Magnetic Field in SBF",
+            title="Satellite Magnetic Field in SB",
             xlabel="Time (s)",
             ylabel="Magnetic Field (nT)",
-            filename="magnetic_field_sbf",
+            filename="magnetic_field_sb",
         )
 
     def plot_magnetic_field_eci(self, state_vector: pd.DataFrame) -> None:
@@ -619,26 +619,26 @@ class MatplotlibPlots:
             filename="sun_vector_eci",
         )
 
-    def plot_sun_vector_sbf(self, state_vector: pd.DataFrame) -> None:
+    def plot_sun_vector_sb(self, state_vector: pd.DataFrame) -> None:
         """
-        Plot sun vector components in SBF vs time.
+        Plot sun vector components in SB vs time.
 
-        Requires: sun_vector_sbf_x/y/z columns.
+        Requires: sun_vector_sb_x/y/z columns.
         """
         series = {
-            "SBF X": (
-                state_vector.index.values, state_vector["sun_vector_sbf_x"].values),
-            "SBF Y": (
-                state_vector.index.values, state_vector["sun_vector_sbf_y"].values),
-            "SBF Z": (
-                state_vector.index.values, state_vector["sun_vector_sbf_z"].values),
+            "SB X": (
+                state_vector.index.values, state_vector["sun_vector_sb_x"].values),
+            "SB Y": (
+                state_vector.index.values, state_vector["sun_vector_sb_y"].values),
+            "SB Z": (
+                state_vector.index.values, state_vector["sun_vector_sb_z"].values),
         }
         self.line_plot(
             series=series,
-            title="Satellite Sun Vector in SBF",
+            title="Satellite Sun Vector in SB",
             xlabel="Time (s)",
-            ylabel="Sun Vector (SBF)",
-            filename="sun_vector_sbf",
+            ylabel="Sun Vector (SB)",
+            filename="sun_vector_sb",
         )
 
     def basic_plots(
@@ -656,7 +656,7 @@ class MatplotlibPlots:
         self.plot_orbit(state_vector, setup)
         self.plot_position(state_vector)
         self.plot_lla(state_vector)
-        self.plot_magnetic_field_sbf(state_vector)
+        self.plot_magnetic_field_sb(state_vector)
         self.plot_magnetic_field_eci(state_vector)
         self.plot_angular_velocity(state_vector)
         self.plot_euler_angles(state_vector)
@@ -664,7 +664,7 @@ class MatplotlibPlots:
         self.plot_angular_acceleration(state_vector)
         self.plot_pointing_error(state_vector)
         self.plot_sun_vector_eci(state_vector)
-        self.plot_sun_vector_sbf(state_vector)
+        self.plot_sun_vector_sb(state_vector)
 
 
 class PlotlyPlots:
@@ -972,26 +972,26 @@ class PlotlyPlots:
             "lla_plotly"
         )
 
-    def plot_magnetic_field_sbf(self, df: pd.DataFrame) -> go.Figure | None:
+    def plot_magnetic_field_sb(self, df: pd.DataFrame) -> go.Figure | None:
         """
-        Plot magnetic field components in SBF vs time (nT).
+        Plot magnetic field components in SB vs time (nT).
 
-        Requires: magnetic_field_sbf_x/y/z columns.
+        Requires: magnetic_field_sb_x/y/z columns.
         """
         x = df.index.values
         series = {}
-        if "magnetic_field_sbf_x" in df:
-            series["SBF X"] = (x, df["magnetic_field_sbf_x"].values)
-        if "magnetic_field_sbf_y" in df:
-            series["SBF Y"] = (x, df["magnetic_field_sbf_y"].values)
-        if "magnetic_field_sbf_z" in df:
-            series["SBF Z"] = (x, df["magnetic_field_sbf_z"].values)
+        if "magnetic_field_sb_x" in df:
+            series["SB X"] = (x, df["magnetic_field_sb_x"].values)
+        if "magnetic_field_sb_y" in df:
+            series["SB Y"] = (x, df["magnetic_field_sb_y"].values)
+        if "magnetic_field_sb_z" in df:
+            series["SB Z"] = (x, df["magnetic_field_sb_z"].values)
         return self.line_plot(
             series,
-            "Satellite Magnetic Field in SBF",
+            "Satellite Magnetic Field in SB",
             "Time (s)",
             "Magnetic Field (nT)",
-            "magnetic_field_sbf_plotly"
+            "magnetic_field_sb_plotly"
         )
 
     def plot_magnetic_field_eci(self, df: pd.DataFrame) -> go.Figure | None:
@@ -1162,26 +1162,26 @@ class PlotlyPlots:
             "sun_vector_eci_plotly"
         )
 
-    def plot_sun_vector_sbf(self, df: pd.DataFrame) -> go.Figure | None:
+    def plot_sun_vector_sb(self, df: pd.DataFrame) -> go.Figure | None:
         """
-        Plot sun vector components in SBF vs time.
+        Plot sun vector components in SB vs time.
 
-        Requires: sun_vector_sbf_x/y/z columns.
+        Requires: sun_vector_sb_x/y/z columns.
         """
         x = df.index.values
         series = {}
-        if "sun_vector_sbf_x" in df:
-            series["SBF X"] = (x, df["sun_vector_sbf_x"].values)
-        if "sun_vector_sbf_y" in df:
-            series["SBF Y"] = (x, df["sun_vector_sbf_y"].values)
-        if "sun_vector_sbf_z" in df:
-            series["SBF Z"] = (x, df["sun_vector_sbf_z"].values)
+        if "sun_vector_sb_x" in df:
+            series["SB X"] = (x, df["sun_vector_sb_x"].values)
+        if "sun_vector_sb_y" in df:
+            series["SB Y"] = (x, df["sun_vector_sb_y"].values)
+        if "sun_vector_sb_z" in df:
+            series["SB Z"] = (x, df["sun_vector_sb_z"].values)
         return self.line_plot(
             series,
-            "Satellite Sun Vector in SBF",
+            "Satellite Sun Vector in SB",
             "Time (s)",
-            "Sun Vector (SBF)",
-            "sun_vector_sbf_plotly"
+            "Sun Vector (SB)",
+            "sun_vector_sb_plotly"
         )
 
     def basic_plots(self, df: pd.DataFrame, setup=None) -> None:
@@ -1199,7 +1199,7 @@ class PlotlyPlots:
         self.plot_orbit(df, planet_radius)
         self.plot_position(df)
         self.plot_lla(df)
-        self.plot_magnetic_field_sbf(df)
+        self.plot_magnetic_field_sb(df)
         self.plot_magnetic_field_eci(df)
         self.plot_angular_velocity(df)
         self.plot_euler_angles(df)
@@ -1207,7 +1207,7 @@ class PlotlyPlots:
         self.plot_angular_acceleration(df)
         self.plot_pointing_error(df)
         self.plot_sun_vector_eci(df)
-        self.plot_sun_vector_sbf(df)
+        self.plot_sun_vector_sb(df)
 
 
 class LivePlotlyLine:

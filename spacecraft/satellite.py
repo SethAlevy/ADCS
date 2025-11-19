@@ -42,10 +42,10 @@ class SatelliteImplementation(Satellite):
                 initial conditions of the satellite's orbit.
             magnetometer (Magnetometer, optional): Magnetometer object for
                 simulating magnetic field measurements. Readings are returned
-                in the SBF (Satellite Body Frame) and ECI (Earth-Centered Inertial)
+                in the SB (Satellite Body Frame) and ECI (Earth-Centered Inertial)
             sunsensor (Sunsensor, optional): Sunsensor object for simulating
                 solar vector measurements. Readings are returned in the
-                SBF (Satellite Body Frame) and ECI (Earth-Centered Inertial)
+                SB (Satellite Body Frame) and ECI (Earth-Centered Inertial)
             sensor_fusion (SensorFusion, optional): SensorFusion object for
                 performing sensor fusion algorithms such as TRIAD, QUEST, or EKF.
             detumbling_threshold (float): The angular velocity magnitude above which
@@ -287,58 +287,58 @@ class SatelliteImplementation(Satellite):
     @property
     def magnetic_field(self) -> np.ndarray:
         """
-        Get the magnetic field vector at the satellite's position in the SBF and
+        Get the magnetic field vector at the satellite's position in the SB and
         ECI frames. The first simulates the measurement, the second is used
         for debugging, sensor fusion algorithms etc. Both are in nT
-        (nanoTesla). Adding bias to the SBF vector can be adjusted in the
+        (nanoTesla). Adding bias to the SB vector can be adjusted in the
         magnetometer object.
 
         Returns:
-            np.ndarray: Magnetic field vector in the SBF and ECI frames in form of
-            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
+            np.ndarray: Magnetic field vector in the SB and ECI frames in form of
+            [[SBx, SBy, SBz], [ECIx, ECIy, ECIz]].
         """
         if self.sensors_time:
             julian_date = ut.time_julian_date(self)
-            mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(
+            mag_sb, mag_eci = self.magnetometer.simulate_magnetometer(
                 self, julian_date)
-            self.magnetometer.last_sbf_measurement = mag_sbf
+            self.magnetometer.last_sb_measurement = mag_sb
             self.magnetometer.last_eci_measurement = mag_eci
-            return mag_sbf, mag_eci
+            return mag_sb, mag_eci
         # reuse last measurements when sensors are off
-        mag_sbf = getattr(self.magnetometer, "last_sbf_measurement", None)
+        mag_sb = getattr(self.magnetometer, "last_sb_measurement", None)
         mag_eci = getattr(self.magnetometer, "last_eci_measurement", None)
-        if mag_sbf is None or mag_eci is None:
+        if mag_sb is None or mag_eci is None:
             julian_date = ut.time_julian_date(self)
-            mag_sbf, mag_eci = self.magnetometer.simulate_magnetometer(
+            mag_sb, mag_eci = self.magnetometer.simulate_magnetometer(
                 self, julian_date)
-            self.magnetometer.last_sbf_measurement = mag_sbf
+            self.magnetometer.last_sb_measurement = mag_sb
             self.magnetometer.last_eci_measurement = mag_eci
-        return mag_sbf, mag_eci
+        return mag_sb, mag_eci
 
     @property
     def sun_vector(self) -> np.ndarray:
         """
         Get the Sun vector as observed from Earth. The vector is computed in
-        ICRF and rotated to SBF; parallax due to satellite altitude is neglected.
+        ICRF and rotated to SB; parallax due to satellite altitude is neglected.
 
         Returns:
-            np.ndarray: Sun vector in the SBF and ECI frames in form of
-            [[SBFx, SBFy, SBFz], [ECIx, ECIy, ECIz]].
+            np.ndarray: Sun vector in the SB and ECI frames in form of
+            [[SBx, SBy, SBz], [ECIx, ECIy, ECIz]].
         """
         if self.sensors_time:
             julian_date = ut.time_julian_date(self)
-            sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
-            self.sunsensor.last_sbf_measurement = sun_sbf
+            sun_, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
+            self.sunsensor.last_sb_measurement = sun_
             self.sunsensor.last_eci_measurement = sun_eci
-            return sun_sbf, sun_eci
-        sun_sbf = getattr(self.sunsensor, "last_sbf_measurement", None)
+            return sun_, sun_eci
+        sun_ = getattr(self.sunsensor, "last_sb_measurement", None)
         sun_eci = getattr(self.sunsensor, "last_eci_measurement", None)
-        if sun_sbf is None or sun_eci is None:
+        if sun_ is None or sun_eci is None:
             julian_date = ut.time_julian_date(self)
-            sun_sbf, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
-            self.sunsensor.last_sbf_measurement = sun_sbf
+            sun_, sun_eci = self.sunsensor.simulate_sunsensor(self, julian_date)
+            self.sunsensor.last_sb_measurement = sun_
             self.sunsensor.last_eci_measurement = sun_eci
-        return sun_sbf, sun_eci
+        return sun_, sun_eci
 
     @property
     def pointing_error_angle(self) -> np.ndarray:
@@ -540,9 +540,9 @@ class SatelliteImplementation(Satellite):
         )
 
         if self.start_pointing and self.actuator_on_time:
-            mag_sbf, _ = self.magnetic_field
+            mag_sb, _ = self.magnetic_field
             angular_acceleration = self.magnetorquer.b_cross(
-                mag_sbf, align_axis, target_dir_body
+                mag_sb, align_axis, target_dir_body
             )
             self._angular_velocity = self.angular_velocity + ut.rad_to_degrees(
                 angular_acceleration

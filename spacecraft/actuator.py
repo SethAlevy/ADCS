@@ -11,7 +11,6 @@ class MagnetorquerImplementation:
     """
 
     def __init__(self, setup: SimulationSetup, satellite: Satellite):
-        # TODO add bang-bang control
         """
         Initialize the magnetorquer with the satellite and setup parameters.
 
@@ -26,7 +25,6 @@ class MagnetorquerImplementation:
         self._satellite = satellite
         self._prev_angle_deg = None
         self._prev_time_s = None
-        # tunables (fallback defaults if missing in JSON)
 
         # Command shaping (dipole)
         self._m_tau: float = 10.0  # nominal
@@ -46,7 +44,6 @@ class MagnetorquerImplementation:
         self.max_current = self._setup.magnetorquer_params["MaxCurrent"]
         self.safety_factor = setup.magnetorquer_params["SafetyFactor"]
         self.alpha_cap = setup.magnetorquer_params.get("AlphaCap", 0.0)
-        # Convert and store rad/s² or None if disabled.
         if self.alpha_cap and self.alpha_cap > 0.0:
             self._alpha_cap_rad = ut.degrees_to_rad(float(self.alpha_cap))
         else:
@@ -150,27 +147,27 @@ class MagnetorquerImplementation:
         if not modified:
             db_dt = self.filtered_derivative(magnetic_field, sensing_time)  # T/s
         else:
-            # Keep filter state aligned to avoid future spikes when re-enabled
             self.magnetic_field_prev = magnetic_field.copy()
             db_dt = None
 
         # Compute the required magnetic dipole moment based on the selected method
         if proportional and modified:
-            mag_dipol_mom_required = (
+            mag_dipole_mom_required = (
                 k * np.cross(angular_velocity, magnetic_field)
                 - self.k_p * angular_velocity
             )
         elif proportional:
-            mag_dipol_mom_required = k * db_dt - self.k_p * angular_velocity
+            mag_dipole_mom_required = k * db_dt - self.k_p * angular_velocity
         elif modified:
-            mag_dipol_mom_required = k * np.cross(angular_velocity, magnetic_field)
+            mag_dipole_mom_required = k * np.cross(angular_velocity, magnetic_field)
         else:
-            mag_dipol_mom_required = k * db_dt
+            mag_dipole_mom_required = k * db_dt
 
-        current_per_axis, commanded_dipol = self.apply_torquer_with_saturation(
-            mag_dipol_mom_required)
+        current_per_axis, commanded_dipole = self.apply_torquer_with_saturation(
+            mag_dipole_mom_required
+        )
         angular_acceleration, current_per_axis = self.current_to_angular_acceleration(
-            commanded_dipol,
+            commanded_dipole,
             magnetic_field,
             current_per_axis,
         )
@@ -178,7 +175,7 @@ class MagnetorquerImplementation:
 
     def current_to_angular_acceleration(
         self,
-        commanded_dipol: np.ndarray,
+        commanded_dipole: np.ndarray,
         magnetic_field: np.ndarray,
         current_per_axis: np.ndarray,
     ):
@@ -187,7 +184,7 @@ class MagnetorquerImplementation:
         If alpha_cap is set, scale torque/current so ||alpha|| <= cap.
 
         Args:
-            commanded_dipol (np.ndarray): The commanded magnetic dipole moment in
+            commanded_dipole (np.ndarray): The commanded magnetic dipole moment in
                 A·m².
             magnetic_field (np.ndarray): The magnetic field vector in T.
             current_per_axis (np.ndarray): The saturated current per axis in A.
@@ -196,7 +193,7 @@ class MagnetorquerImplementation:
                 angular acceleration [rad/s²], current_per_axis [A].
         """
 
-        tau_raw = np.cross(commanded_dipol, magnetic_field)
+        tau_raw = np.cross(commanded_dipole, magnetic_field)
 
         # Dynamics terms
         omega_rad = ut.degrees_to_rad(self._satellite.angular_velocity)
@@ -208,7 +205,6 @@ class MagnetorquerImplementation:
         if s < 1.0:
             current_per_axis = current_per_axis * s
 
-        # Store effective torque
         self.torque = tau_eff
 
         return alpha, current_per_axis
@@ -259,7 +255,7 @@ class MagnetorquerImplementation:
     def apply_torquer_with_saturation(
         self,
         magnetic_dipole_moment: np.ndarray,
-    ) -> np.ndarray:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Uniform-scaling saturation. Converts dipole (A·m^2) to per-axis current (A)
         and scales the whole vector so no axis exceeds its limit. The maximum current,
@@ -270,10 +266,11 @@ class MagnetorquerImplementation:
                 vector in A·m^2.
 
         Returns:
-            np.ndarray: The saturated current per axis in A.
+            tuple[np.ndarray, np.ndarray]: The saturated current per axis [A] and the
+                achievable magnetic dipole moment [A·m²]. 
         """
         # vector saturation that preserves direction
-        m_cmd = np.asarray(magnetic_dipole_moment, dtype=float)
+        m_cmd = magnetic_dipole_moment
         m_max = float(
             self.no_of_coils * self.coil_area * self.max_current * self.safety_factor
         )
@@ -291,8 +288,8 @@ class MagnetorquerImplementation:
         """
         Convert coil currents [A] to magnetic dipole [A·m²].
         """
-        return (
-            np.asarray(current_per_axis, dtype=float)
+        return np.array(
+            current_per_axis
             * self.no_of_coils
             * self.coil_area
         )
@@ -330,17 +327,19 @@ class MagnetorquerImplementation:
 
     def b_cross(
         self,
-        magnetic_field_sbf: np.ndarray,
+        magnetic_field_sb: np.ndarray,
         align_axis: np.ndarray | list,
         target_dir_body: np.ndarray,
     ) -> np.ndarray:
         """
+        CAUTION: pointing is still work in progress.
+
         B-cross pointing control (Earth or Sun pointing). Generates angular acceleration
         (rad/s^2) based on the error angle. The method combines alignment and damping
         torques to achieve stable pointing.
 
         Args:
-            magnetic_field_sbf (np.ndarray): The magnetic field vector in the
+            magnetic_field_sb (np.ndarray): The magnetic field vector in the
                 spacecraft body frame in nT.
             align_axis (np.ndarray | list): The axis in the body frame to be aligned
                 with the target direction. Specified inside the initial settings json
@@ -349,8 +348,7 @@ class MagnetorquerImplementation:
                 Calculated based on the specified mode ("earth_pointing" or
                 "sun_pointing").
         """
-        magnetic_field_sb = magnetic_field_sbf * 1e-9  # nT to T
-        align_axis = np.asarray(align_axis, dtype=float)
+        magnetic_field_sb = magnetic_field_sb * 1e-9  # nT to T
         align_axis = ut.normalize(align_axis)
         target_dir_body = ut.normalize(target_dir_body)
 
@@ -361,19 +359,22 @@ class MagnetorquerImplementation:
             align_axis, target_dir_body
         )
 
-        b, b_norm, b_hat, inv_b2, omega_par, omega_perp = self._b_decompose(
-            magnetic_field_sb, angular_velocity_rad_s
-        )
+        magnetic_field_sb, magnetic_field_norm, magnetic_field_hat, \
+            inv_magnetic_field_squared, omega_par, omega_perp = self._b_decompose(
+                magnetic_field_sb,
+                angular_velocity_rad_s
+            )
 
         # Base PD terms
         k_c_eff, k_cp_eff = self._bcross_schedule(theta)
-        m_align_base = k_c_eff * np.cross(error_vec, b) * inv_b2
-        m_damp_base = k_cp_eff * np.cross(omega_perp, b) * inv_b2
+        m_align_base = k_c_eff * np.cross(error_vec, magnetic_field_sb) \
+            * inv_magnetic_field_squared
+        m_damp_base = k_cp_eff * np.cross(omega_perp, magnetic_field_sb) \
+            * inv_magnetic_field_squared
 
         # Geometry metric: sin(gamma) between target and B
-        sin_gamma = float(np.linalg.norm(np.cross(target_dir_body, b))) / max(
-            b_norm, 1e-12
-        )
+        sin_gamma = np.linalg.norm(np.cross(target_dir_body, magnetic_field_sb)) \
+            / max(magnetic_field_norm, 1e-12)
 
         # High-rate gate → damping only (takes precedence)
         gated = self._apply_high_rate_damp_gate(omega_norm, on_deg=0.18, off_deg=0.10)
@@ -395,9 +396,15 @@ class MagnetorquerImplementation:
         dt = float(getattr(self._setup, "iterations_info", {}).get("Step", 1.0))
         commanded_dipole = self._shape_dipole(commanded_dipole_raw, dt)
 
-        current_per_axis = self.apply_torquer_with_saturation(commanded_dipole)
+        current_per_axis, commanded_dipole = self.apply_torquer_with_saturation(
+            commanded_dipole
+        )
         angular_acceleration_rad_s2, current_per_axis = (
-            self.current_to_angular_acceleration(commanded_dipole, b, current_per_axis)
+            self.current_to_angular_acceleration(
+                commanded_dipole,
+                magnetic_field_sb,
+                current_per_axis
+            )
         )
         m_actual = self.coils_to_dipole(current_per_axis)
 
@@ -425,10 +432,14 @@ class MagnetorquerImplementation:
         """
         First-order low-pass toward m_cmd and vector slew limit.
         Set self._m_tau=0 and self._m_slew=0 to bypass.
-        """
-        m_cmd = np.asarray(m_cmd, dtype=float)
 
-        # LPF
+        Args:
+            m_cmd (np.ndarray): The commanded magnetic dipole moment in A·m².
+            dt (float): Time step in seconds.
+
+        Returns:
+            np.ndarray: The shaped magnetic dipole moment in A·m².
+        """
         if self._m_tau > 0:
             alpha = float(np.clip(dt / max(self._m_tau, 1e-6), 0.0, 1.0))
             self._m_filt = self._m_filt + alpha * (m_cmd - self._m_filt)
@@ -456,10 +467,18 @@ class MagnetorquerImplementation:
     ) -> tuple[np.ndarray, float]:
         """
         Rotation vector (rad) to rotate align_axis into target_dir_body.
-        Returns (error_vec [rad], theta [rad]). Includes small deadzone.
+
+        Args:
+            align_axis (np.ndarray): The axis in the body frame to be aligned
+                with the target direction.
+            target_dir_body (np.ndarray): The target direction vector in the body frame.
+
+        Returns:
+            tuple[np.ndarray, float]: The error vector in radians and the angle theta
+                in radians.
         """
-        a = ut.normalize(np.asarray(align_axis, dtype=float))
-        tgt = ut.normalize(np.asarray(target_dir_body, dtype=float))
+        a = ut.normalize(align_axis)
+        tgt = ut.normalize(target_dir_body)
 
         dot = float(np.clip(np.dot(a, tgt), -1.0, 1.0))
         v = np.cross(a, tgt)
@@ -496,22 +515,37 @@ class MagnetorquerImplementation:
     ) -> tuple[np.ndarray, float, np.ndarray, float, np.ndarray, np.ndarray]:
         """
         B-field quantities and ω decomposition.
-        Returns (b, b_norm, b_hat, inv_b2, omega_par, omega_perp).
-        """
-        b = np.asarray(magnetic_field_sb, dtype=float)
-        b_norm = float(np.linalg.norm(b))
-        b_safe = max(b_norm, 1e-9)
-        inv_b2 = 1.0 / (b_safe * b_safe)
 
-        if b_norm > 0.0:
-            b_hat = b / b_norm
-            omega_par = b_hat * float(np.dot(angular_velocity_rad_s, b_hat))
+        Args:
+            magnetic_field_sb (np.ndarray): The magnetic field vector in the
+                spacecraft body frame in T.
+            angular_velocity_rad_s (np.ndarray): The angular velocity vector in rad/s.
+
+        Returns:
+            tuple[np.ndarray, float, np.ndarray, float, np.ndarray, np.ndarray]:
+                magnetic_field_sb (T),
+                magnetic_field_norm (T),
+                magnetic_field_hat (unit vector),
+                inv_magnetic_field_squared (1/T²),
+                omega_par (rad/s),
+                omega_perp (rad/s).
+        """
+        magnetic_field_norm = float(np.linalg.norm(magnetic_field_sb))
+        magnetic_field_safe = max(magnetic_field_norm, 1e-9)
+        inv_magnetic_field_squared = 1.0 / (magnetic_field_safe * magnetic_field_safe)
+
+        if magnetic_field_norm > 0.0:
+            magnetic_field_hat = magnetic_field_sb / magnetic_field_norm
+            omega_par = magnetic_field_hat * float(
+                np.dot(angular_velocity_rad_s, magnetic_field_hat)
+            )
         else:
-            b_hat = np.zeros(3, dtype=float)
+            magnetic_field_hat = np.zeros(3, dtype=float)
             omega_par = np.zeros(3, dtype=float)
 
         omega_perp = angular_velocity_rad_s - omega_par
-        return b, b_norm, b_hat, inv_b2, omega_par, omega_perp
+        return magnetic_field_sb, magnetic_field_norm, magnetic_field_hat, \
+            inv_magnetic_field_squared, omega_par, omega_perp
 
     def _apply_high_rate_damp_gate(
         self,
